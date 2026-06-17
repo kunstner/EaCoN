@@ -1354,7 +1354,9 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
   doParallel::registerDoParallel(cls)
   gamma <- 0
   `%dopar%` <- foreach::"%dopar%"
-  fit.val <- as.data.frame(foreach::foreach(gamma = gammavec, .combine = "rbind", .inorder = TRUE) %dopar% {
+  # fit.val <- as.data.frame(foreach::foreach(gamma = gammavec, .combine = "rbind", .inorder = TRUE) %dopar% {
+  fit.val <- as.data.frame(foreach::foreach(gamma = gammavec,
+    .combine = "rbind", .inorder = TRUE, .final = as.data.frame) %dopar% {
     tmsg(paste0(" gamma = ", gamma))
     odirg <- paste0(odir, "/gamma", sprintf("%.2f", gamma))
     dir.create(path = odirg, recursive = TRUE, showWarnings = FALSE)
