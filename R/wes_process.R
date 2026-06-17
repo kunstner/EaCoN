@@ -38,7 +38,7 @@ BINpack.Maker <- function(bed.file = NULL, bin.size = 50, genome.pkg = "BSgenome
   message(paste0("Loading ", genome.pkg, " ..."))
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- BSgenome::providerVersion(BSg.obj)
+  # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
   organism <- BSgenome::organism(BSg.obj)
 
@@ -134,7 +134,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
   tmsg(paste0("Loading ", genome.pkg, " ..."))
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- BSgenome::providerVersion(BSg.obj)
+  # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
   ## Files controls
   tmsg("Checking BINpack and BAMs compatibility ...")
@@ -521,7 +521,7 @@ WES.Normalize <- function(data = NULL, BINpack = NULL, gc.renorm = TRUE, wave.re
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   # requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- BSgenome::providerVersion(BSg.obj)
+  # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
 
@@ -935,7 +935,7 @@ loc.nt.count.hs <- function(loc.df = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   # require(genome.pkg, character.only = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- BSgenome::providerVersion(BSg.obj)
+  # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
 

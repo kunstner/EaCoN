@@ -229,7 +229,7 @@ BedCheck <- function(bed.file = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.hg19"
   message(paste0("Loading ", genome.pkg, " ..."))
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- BSgenome::providerVersion(BSg.obj)
+  genome <- metadata(BSg.obj)$genome
 
   bed.data <- read.table(file = bed.file, header = FALSE, sep = "\t", comment.char = "#", stringsAsFactors = TRUE)
   if (ncol(bed.data) < 3) stop("BED file must contain at least 3 columns !", call. = FALSE)

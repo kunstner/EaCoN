@@ -4,7 +4,7 @@ EaCoN.l2rplot.geno <- function(l2r = NULL, seg = NULL, seg.col = list(gain = "bl
   # message(tmsg(paste0("Loading ", genome.pkg, " ...")))
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- BSgenome::providerVersion(BSg.obj)
+  genome <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   # data(list = genome, package = "chromosomes", envir = environment())
@@ -57,7 +57,7 @@ EaCoN.bafplot.geno <- function(baf = NULL, seg = NULL, seg.col = list(Hetero = "
 
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- BSgenome::providerVersion(BSg.obj)
+  genome <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   # data(list = genome, package = "chromosomes", envir = environment())
@@ -94,7 +94,7 @@ EaCoN.l2rplot.karyo <- function(l2r = NULL, seg = NULL, seg.col = list(gain = "b
 
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- BSgenome::providerVersion(BSg.obj)
+  genome <- metadata(BSg.obj)$genome
   # cs <- chromobjector(BSg.obj)
   
   self.pkg.name <- "EaCoN"
@@ -153,7 +153,7 @@ EaCoN.l2rplot.chromo <- function(chr = NULL, l2r = NULL, l2r.seg = NULL, baf = N
   
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- BSgenome::providerVersion(BSg.obj)
+  genome <- metadata(BSg.obj)$genome
   # cs <- chromobjector(BSg.obj)
   
   self.pkg.name <- "EaCoN"

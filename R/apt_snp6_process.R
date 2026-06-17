@@ -79,7 +79,7 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   tmsg(paste0("Loading ", genome.pkg, " ..."))
   suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome2 <- BSgenome::providerVersion(BSg.obj)
+  # genome2 <- metadata(BSg.obj)$genome
   genome2 <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
