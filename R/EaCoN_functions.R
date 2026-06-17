@@ -1578,7 +1578,7 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
   # colnames(fit.val) <- c("gamma", "ploidy", "rounded.ploidy", "aberrant.cell.fraction", "GoF", "psi")
   colnames(fit.val) <- c("gamma", "ploidy.ASCAT", "ploidy.Median", "ploidy.Most.width", "ploidy.Width.weighted", "aberrant.cell.fraction", "GoF", "psi")
   if (any(!is.na(fit.val$gamma))) {
-    fit.val[,1] <- gammavec
+        fit.val[, 1] <- gammavec[seq_len(nrow(fit.val))]
     gammaOpt.idx <- which.max(fit.val$GoF)
     gammaOpt <- fit.val$gamma[gammaOpt.idx]
     write.table(fit.val, file = paste0(odir, "/", samplename, ".gammaEval.txt"), sep = "\t", quote = FALSE, row.names = FALSE)
