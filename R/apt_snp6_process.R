@@ -121,7 +121,7 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   )
 
   ## Extracting data : L2R
-  ao.df <- dplyr::as.tbl(data.frame(my.oschp$MultiData$CopyNumber[,c(2:4)], L2R.ori = as.vector(my.oschp$MultiData$CopyNumber[[l2r.lev.conv[[l2r.level]]]])))
+  ao.df <- dplyr::tibble::as_tibble(data.frame(my.oschp$MultiData$CopyNumber[,c(2:4)], L2R.ori = as.vector(my.oschp$MultiData$CopyNumber[[l2r.lev.conv[[l2r.level]]]])))
   ao.df$Chromosome <- as.integer(ao.df$Chromosome) ### Patching the Chromosome column : on R4+, it is read as 'raw', we need ints
   affy.meta <- my.oschp$Meta
   affy.chrom <- my.oschp$MultiData[["CopyNumber_&keyvals"]][seq.int(3, nrow(my.oschp$MultiData[["CopyNumber_&keyvals"]]), 3),1:2]
@@ -141,7 +141,7 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   baf.df <- baf.df[!is.na(baf.df$BAF),]
   gc()
   
-  ao.df <- suppressWarnings(Reduce(function(t1, t2) dplyr::left_join(t1, t2, by = "ProbeSetName"), list(ao.df, dplyr::as.tbl(data.frame(ProbeSetName = rownames(baf.df), BAF.ori = baf.df$BAF, BAF = baf.df$BAF)), dplyr::as.tbl(my.oschp$MultiData$CopyNumber[,c(2,9)]))))
+  ao.df <- suppressWarnings(Reduce(function(t1, t2) dplyr::left_join(t1, t2, by = "ProbeSetName"), list(ao.df, dplyr::tibble::as_tibble(data.frame(ProbeSetName = rownames(baf.df), BAF.ori = baf.df$BAF, BAF = baf.df$BAF)), dplyr::tibble::as_tibble(my.oschp$MultiData$CopyNumber[,c(2,9)]))))
   rm(my.oschp, baf.df)
   gc()
   

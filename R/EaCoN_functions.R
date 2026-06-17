@@ -575,7 +575,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
   rownames(data$data$Tumor_LogR_segmented) <- rownames(data$data$SNPpos)
   #### BAF
   tmbaf <- BAF2mBAF(data$data$Tumor_BAF[,1])
-  baf.tbl <- dplyr::as.tbl(data.frame(seg = F.proc.out$jointseg$seg, BAF = tmbaf[facets.keep]))
+  baf.tbl <- dplyr::tibble::as_tibble(data.frame(seg = F.proc.out$jointseg$seg, BAF = tmbaf[facets.keep]))
   baf.tbl <- dplyr::group_by(baf.tbl, seg)
   data$data$Tumor_BAF_segmented <- list(matrix(rep(dplyr::summarize(baf.tbl, baf.med = median(BAF, na.rm = TRUE))$baf.med, diff(c(0,seg.end.idx))), ncol = 1))
   rownames(data$data$Tumor_BAF_segmented[[1]]) <- rownames(data$data$SNPpos)
@@ -1378,7 +1378,7 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
       # wt.tcn <- my.tcn * (my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1)
       # sum(wt.tcn) / sum(my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1)
 
-      tcn.tbl.ung <- dplyr::as.tbl(cbind(my.ascat.seg.ascn$segments, nTotal = my.ascat.seg.ascn$segments$nMajor + my.ascat.seg.ascn$segments$nMinor, width = my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1))
+      tcn.tbl.ung <- dplyr::tibble::as_tibble(cbind(my.ascat.seg.ascn$segments, nTotal = my.ascat.seg.ascn$segments$nMajor + my.ascat.seg.ascn$segments$nMinor, width = my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1))
       tcn.tbl <- dplyr::group_by(tcn.tbl.ung, nTotal)
       tcn.tbl.prop <- dplyr::summarise(tcn.tbl, tot_width = sum(width))
       ascat.ploidy <- my.ascat.seg.ascn$ploidy
@@ -1648,7 +1648,7 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
   if (!"loglik" %in% names(ascn.res)) ascn.res$loglik <- NA
 
   ## Handling ploidy
-  tcn.tbl.ung <- dplyr::as.tbl(cbind(ascn.res$cncf, width = ascn.res$cncf$end - ascn.res$cncf$start + 1))
+  tcn.tbl.ung <- dplyr::tibble::as_tibble(cbind(ascn.res$cncf, width = ascn.res$cncf$end - ascn.res$cncf$start + 1))
   tcn.tbl <- dplyr::group_by(tcn.tbl.ung, tcn.em)
   tcn.tbl.prop <- dplyr::summarise(tcn.tbl, tot_width = sum(width))
 
@@ -1874,7 +1874,7 @@ ASCN.SEQUENZA <- function(data = NULL, max.ploidy = 4, ploidy.step = .1, seg.min
 
   ## Computing other ploidy measures
   ascn.res$purity <- cellularity
-  seg.tbl <- dplyr::as.tbl(ascn.res$data)
+  seg.tbl <- dplyr::tibble::as_tibble(ascn.res$data)
   seg.tbl <- dplyr::group_by(seg.tbl, CNt)
   seg.tbl.prop <- dplyr::summarise(seg.tbl, tot_width = sum(width))
   median.ploidy <- limma::weighted.median(seg.tbl.prop$CNt, seg.tbl.prop$tot_width)
