@@ -1568,7 +1568,11 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
     }
   }, stringsAsFactors = FALSE)
   parallel::stopCluster(cls)
-  rownames(fit.val) <- gammavec
+  
+  # rownames(fit.val) <- gammavec
+  fit.val <- as.data.frame(fit.val)
+  rownames(fit.val) <- gammavec[seq_len(nrow(fit.val))]
+  
   # colnames(fit.val) <- c("gamma", "ploidy", "rounded.ploidy", "aberrant.cell.fraction", "GoF", "psi")
   colnames(fit.val) <- c("gamma", "ploidy.ASCAT", "ploidy.Median", "ploidy.Most.width", "ploidy.Width.weighted", "aberrant.cell.fraction", "GoF", "psi")
   if (any(!is.na(fit.val$gamma))) {
