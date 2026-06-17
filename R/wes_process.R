@@ -162,7 +162,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
     source.file = list(refBAM = refBAM, testBAM = testBAM, BINpack = BINpack),
     type = "WES",
     manufacturer = manufacturer,
-    species = GenomeInfoDb::organism(BSg.obj),
+    species = BiocGenerics::organism(BSg.obj),
     genome = genome,
     genome.pkg = genome.pkg,
     predicted.gender = "NA"
