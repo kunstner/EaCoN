@@ -119,7 +119,7 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
     predicted.gender = pgender
   )
   
-  ao.df <- dplyr::tibble::as_tibble(data.frame(my.oschp$ProbeSets$CopyNumber[,c(1:3)], L2R.ori = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]])))
+  ao.df <- tibble::as_tibble(data.frame(my.oschp$ProbeSets$CopyNumber[,c(1:3)], L2R.ori = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]])))
   ao.df$L2R <- ao.df$L2R.ori
   affy.chrom <- my.oschp$Chromosomes$Summary
   ak <- affy.chrom$Display
@@ -137,7 +137,7 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
   baf.df <- baf.df[!is.na(baf.df$BAF),]
   gc()
   
-  ao.df <- suppressWarnings(Reduce(function(t1, t2) dplyr::left_join(t1, t2, by = "ProbeSetName"), list(ao.df, dplyr::tibble::as_tibble(data.frame(ProbeSetName = rownames(baf.df), BAF = baf.df$BAF)), dplyr::tibble::as_tibble(my.oschp$ProbeSets$AllelicData[,c(1,4)]), dplyr::tibble::as_tibble(my.oschp$Genotyping$Calls[,c(2,5:7)]))))
+  ao.df <- suppressWarnings(Reduce(function(t1, t2) dplyr::left_join(t1, t2, by = "ProbeSetName"), list(ao.df, tibble::as_tibble(data.frame(ProbeSetName = rownames(baf.df), BAF = baf.df$BAF)), tibble::as_tibble(my.oschp$ProbeSets$AllelicData[,c(1,4)]), tibble::as_tibble(my.oschp$Genotyping$Calls[,c(2,5:7)]))))
   rm(baf.df)
   gc()
   

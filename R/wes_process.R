@@ -186,7 +186,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
     ### Making pileup
     tmsg("   Getting pileup ...")
     param.BAM <- Rsamtools::ScanBamParam(which = GenomicRanges::makeGRangesFromDataFrame(bed.data, seqnames.field = "chr"), flag = scanBamFlag)
-    pres <- dplyr::tibble::as_tibble(Rsamtools::pileup(BamFile, scanBamParam = param.BAM, pileupParam = pileupParam))
+    pres <- tibble::as_tibble(Rsamtools::pileup(BamFile, scanBamParam = param.BAM, pileupParam = pileupParam))
     colnames(pres)[c(1,5)] <- c("chr", "bin")
     levels(pres$bin) <- bed.data$ProbeSetName
     pres$bin <- as.integer(as.character(pres$bin))
@@ -212,7 +212,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
     merged <- suppressWarnings(dplyr::left_join(refblock, pres, by = c("chr", "pos", "nucleotide")))
     rm(pres, refblock)
     gc()
-    bed.based <- dplyr::tibble::as_tibble(data.frame(chr = unique(bed.data$chr), pos = as.integer(unlist(seq.int2(from = bed.data$start, to = bed.data$end, by = 1))), bin = rep(bed.data$ProbeSetName, times = (bed.data$end - bed.data$start +1))))
+    bed.based <- tibble::as_tibble(data.frame(chr = unique(bed.data$chr), pos = as.integer(unlist(seq.int2(from = bed.data$start, to = bed.data$end, by = 1))), bin = rep(bed.data$ProbeSetName, times = (bed.data$end - bed.data$start +1))))
     bed.joint <- suppressWarnings(dplyr::left_join(bed.based, merged, c("chr", "pos", "bin"))) ### yeah !
     rm(bed.based)
     gc()
