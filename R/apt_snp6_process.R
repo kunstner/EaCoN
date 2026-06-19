@@ -20,9 +20,6 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   # write.data <- TRUE
   # plot <- TRUE
   # force <- FALSE
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/renorm_functions.R")
 
 
   ## Early checks
@@ -63,10 +60,10 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   ## Checking apt-copynumber-cyto-ssa package loc
   apt.snp6.pkg.name <- paste0("apt.snp6.", apt.version)
   if (!(apt.snp6.pkg.name %in% installed.packages())) stop(tmsg(paste0("Package ", apt.snp6.pkg.name, " not found !")), call. = FALSE)
-  suppressPackageStartupMessages(require(package = apt.snp6.pkg.name, character.only = TRUE))
+  requireNamespace(apt.snp6.pkg.name, quietly = TRUE)
 
   ## Processing CEL to an OSCHP file
-  oscf <- apt.snp6.process(CEL = CEL, samplename = samplename, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
+  oscf <- get("apt.snp6.process", envir = asNamespace(apt.snp6.pkg.name))(CEL = CEL, samplename = samplename, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
 
   ## Reading OSCHP
   my.oschp <- oschp.load(file = oscf)
@@ -77,10 +74,10 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   
   ### Loading genome info
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome2 <- metadata(BSg.obj)$genome
-  genome2 <- metadata(BSg.obj)$genome
+  # genome2 <- S4Vectors::metadata(BSg.obj)$genome
+  genome2 <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   
@@ -188,7 +185,7 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
   
   ao.df$cluster <- NA
   ao.df$uni <- FALSE
-  suppressPackageStartupMessages(library(mclust))
+  requireNamespace("mclust", quietly = TRUE)
   mc.G <- 4
   mc.mN <- "E"
   smeds <- hrates <- vector()
@@ -322,8 +319,8 @@ SNP6.Process <- function(CEL = NULL, samplename = NULL, l2r.level = "normal", gc
       Germline_LogR = NULL,
       Germline_BAF = NULL,
       SNPpos = data.frame(chrs = ao.df$chr, pos = ao.df$pos, row.names = ao.df$ProbeSetName),
-      ch = sapply(unique(ao.df$chr), function(x) { which(ao.df$chr == x) }),
-      chr = sapply(unique(ao.df$chrgap), function(x) { which(ao.df$chrgap == x) }),
+      ch = split(seq_along(ao.df$chr), ao.df$chr)[unique(ao.df$chr)],
+      chr = split(seq_along(ao.df$chrgap), as.integer(ao.df$chrgap))[unique(as.integer(ao.df$chrgap))],
       chrs = unique(ao.df$chr),
       samples = samplename,
       gender = as.vector(meta.b$predicted.gender),

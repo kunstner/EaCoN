@@ -35,7 +35,7 @@ get.mad <- function(val = NULL) {
 }
 
 get.valid.genomes <- function() {
-  return(list("hg18" = "BSgenome.Hsapiens.UCSC.hg18", "hg19" = "BSgenome.Hsapiens.UCSC.hg19", "hg38" = "BSgenome.Hsapiens.UCSC.hg38", "hs37d5" = "BSgenome.Hsapiens.1000genomes.hs37d5"))
+  return(list("hg19" = "BSgenome.Hsapiens.UCSC.hg19", "hg38" = "BSgenome.Hsapiens.UCSC.hg38", "hs37d5" = "BSgenome.Hsapiens.1000genomes.hs37d5"))
 }
 
 num2mat <- function(num=NULL) {
@@ -100,28 +100,23 @@ tmsg <- function(text = NULL) { message(paste0(" [", Sys.info()[['nodename']], "
 ## Vectorization of seq.default()
 seq.int2 <- Vectorize(seq.default, SIMPLIFY = FALSE)
 
-## Fast file writing using iotools::write.csv.raw
-write.table.fast <- function(x, file = NULL, header = TRUE, sep = "\t", fileEncoding="", row.names = FALSE, ...) {
-  if (header) write.table(x = x[NULL,], file = file, sep = "\t", quote = FALSE, row.names = FALSE, fileEncoding = fileEncoding)
-  if(!row.names) rownames(x) <- NULL
-  trychk <- try(iotools::write.csv.raw(x = x, file = file, sep = sep, col.names=FALSE, fileEncoding=fileEncoding, append = header, ...))
-  if (!is.null(trychk)) {
-    print("Fast write failed, using canonical write.table ...")
-    write.table(x = x, file = file, sep = sep, row.names = row.names, quote = FALSE)
-  }
+## File writing using readr::write_tsv
+write.table.fast <- function(x, file = NULL, header = TRUE, sep = "\t", fileEncoding = "", row.names = FALSE, ...) {
+  if (!row.names) rownames(x) <- NULL
+  readr::write_tsv(x = x, file = file, col_names = header, ...)
   gc()
 }
 
-## Fast file reader using data.table::fread
-read.table.fast <- function(file = NULL, header = TRUE, sep= "\t", row.names = FALSE, ...) {
+## File reader using readr::read_tsv
+read.table.fast <- function(file = NULL, header = TRUE, sep = "\t", row.names = FALSE, ...) {
   if (row.names) {
-    if (header) h.df <- read.table(file = file, sep = sep, header = header, nrows = 1, check.names = FALSE)
-    data.df <- data.table::fread(input = file, sep = sep, header = FALSE, skip = 1, data.table = FALSE, ...)
-    rownames(data.df) <- data.df[,1]
-    data.df[,1] <- NULL
+    h.df   <- as.data.frame(readr::read_tsv(file = file, col_names = TRUE,  n_max  = 0L, show_col_types = FALSE))
+    data.df <- as.data.frame(readr::read_tsv(file = file, col_names = FALSE, skip   = if (header) 1L else 0L, show_col_types = FALSE, ...))
     if (header) colnames(data.df) <- colnames(h.df)
+    rownames(data.df) <- data.df[, 1]
+    data.df[, 1] <- NULL
   } else {
-    data.df <- data.table::fread(input = file, sep = sep, header = header, data.table = FALSE, ...)
+    data.df <- as.data.frame(readr::read_tsv(file = file, col_names = header, show_col_types = FALSE, ...))
   }
   return(data.df)
 }
@@ -142,8 +137,8 @@ EaCoN.set.bitmapType <- function(type = "cairo") {
 chromobjector <- function(BSg = NULL) {
   if (is.null(BSg)) stop("NULL object !", call. = FALSE)
   # chromobj <- list(species = BiocGenerics::organism(BSg), genomebuild = BSgenome::providerVersion(BSg))
-  chromobj <- list(species = BiocGenerics::organism(BSg), genomebuild = metadata(BSg)$genome)
-  chromdf <- data.frame(chrom = BSgenome::seqnames(BSg), chrN = seq_along(BSgenome::seqnames(BSg)), chr.length = GenomeInfoDb::seqlengths(BSg), stringsAsFactors = FALSE)
+  chromobj <- list(species = BiocGenerics::organism(BSg), genomebuild = S4Vectors::metadata(BSg)$genome)
+  chromdf <- data.frame(chrom = BSgenome::seqnames(BSg), chrN = seq_along(BSgenome::seqnames(BSg)), chr.length = GenomeInfoDb::seqlengths(BSg))
   chromdf$chr.length.sum <- cumsum(as.numeric(chromdf$chr.length))
   chromdf$chr.length.toadd <- c(0, chromdf$chr.length.sum[-nrow(chromdf)])
   chromdf$mid.chr <- round(diff(c(0, chromdf$chr.length.sum)) /2)
@@ -161,15 +156,21 @@ chromobjector <- function(BSg = NULL) {
 ## Handles GZ, BZ2 or ZIP -compressed CEL files
 compressed_handler <- function(CELz = NULL) {
   `%do%` <- foreach::"%do%"
-  CELz2 <- foreach(CEL = CELz, .combine = "c") %do% {
+  CELz2 <- foreach::foreach(CEL = CELz, .combine = "c") %do% {
     tmsg(paste0("Decompressing ", CEL, " ..."))
     if (tolower(tools::file_ext(CEL)) == "bz2") {
       uncomp_file <- tempfile(fileext = ".CEL")
-      R.utils::bunzip2(filename = CEL, destname = uncomp_file, FUN = bzfile, remove = FALSE)
+      con_in  <- bzfile(CEL, open = "rb")
+      con_out <- file(uncomp_file, open = "wb")
+      writeBin(readBin(con_in, what = "raw", n = file.size(CEL) * 10L), con_out)
+      close(con_in); close(con_out)
       CEL <- uncomp_file
     } else if (tolower(tools::file_ext(CEL)) == "gz") {
       uncomp_file <- tempfile(fileext = ".CEL")
-      R.utils::gunzip(filename = CEL, destname = uncomp_file, FUN = gzfile, remove = FALSE)
+      con_in  <- gzfile(CEL, open = "rb")
+      con_out <- file(uncomp_file, open = "wb")
+      writeBin(readBin(con_in, what = "raw", n = file.size(CEL) * 10L), con_out)
+      close(con_in); close(con_out)
       CEL <- uncomp_file
     } else if (tolower(tools::file_ext(CEL)) == "zip") {
       zlist <- utils::unzip(CEL, list = TRUE)

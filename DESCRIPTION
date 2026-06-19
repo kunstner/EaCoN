@@ -2,19 +2,21 @@ Encoding: UTF-8
 Package: EaCoN
 Type: Package
 Title: EaCoN : Easy Copy Number !
-Version: 0.3.6-2
-Date: 2021-10-18
-Author: Bastien Job
-Authors@R: person("Bastien", "Job", email = "bastien.job@inserm.fr", role = c("aut", "cre"))
-Depends: R(>= 3.1.0)
+Version: 0.4.0
+Date: 2026-06-18
+Author: Bastien Job [aut], Axel Künstner [ctb]
+Authors@R: c(
+  person("Bastien", "Job", email = "bastien.job@inserm.fr", role = "aut"),
+  person("Axel", "Künstner", email = "axel.kuenstner@uni-luebeck.de", role = c("ctb", "cre")))
+Depends: R(>= 4.2.0)
 Imports:
   affxparser,
   aroma.light,
   ASCAT,
   Biostrings,
+  BiocGenerics,
   BSgenome,
   changepoint,
-  data.table,
   doParallel,
   dplyr,
   DT,
@@ -22,16 +24,19 @@ Imports:
   foreach,
   GenomeInfoDb,
   GenomicRanges,
-  iotools,
   IRanges,
   limma,
   mclust,
-  R.utils,
+  purrr,
+  readr,
   rhdf5,
+  rlang,
+  S4Vectors,
   seqinr,
-  sequenza
+  sequenza,
+  tibble,
+  withr
 Suggests:
-  BSgenome.Hsapiens.UCSC.hg18,
   BSgenome.Hsapiens.UCSC.hg19,
   BSgenome.Hsapiens.UCSC.hg38,
   BSgenome.Hsapiens.1000genomes.hs37d5,
@@ -43,7 +48,7 @@ Suggests:
   rcnorm,
   rmarkdown
 biocViews: Software
-BugReports: https://github.com/gustaveroussy/EaCoN/issues
+BugReports: https://github.com/kunstner/EaCoN/issues
 Description: Easy copy-number analysis for Affymetrix microarrays (snp6.0, CytoScanHD, CytoScan750K & OncoScan) and whole exome sequencing data.
 License: MIT + file LICENSE
 LazyData: false

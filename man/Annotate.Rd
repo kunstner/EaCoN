@@ -3,7 +3,8 @@
 \title{Annotation of segmented regions and generation of an HTML QC report}
 \usage{
   Annotate(data = NULL, refGene.table = NULL, targets.table = NULL,
-  report = TRUE, author.name = "", out.dir = getwd())
+  report = TRUE, author.name = "", out.dir = getwd(),
+  solo = FALSE, ldb = "/mnt/data_cigogne/bioinfo/", grd = "grd")
 }
 \arguments{
   \item{data}{Data object contained in a RDS file generated with \code{Segment.ASCAT()}..}
@@ -12,6 +13,9 @@
   \item{report}{Generate the HTML report.}
   \item{author.name}{Name of the author/lab/facility to display in the HTML report.}
   \item{out.dir}{The output directory.}
+  \item{solo}{Run in solo mode.}
+  \item{ldb}{Path to local database directory.}
+  \item{grd}{Grid parameter.}
 }
 \description{
   This function performs the genomic annotation of segmented regions, and builds an HTML interactive QC report.

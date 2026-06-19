@@ -1,8 +1,8 @@
-\name{EaCoN.BedCheck}
-\alias{EaCoN.BedCheck}
+\name{BedCheck}
+\alias{BedCheck}
 \title{Performs checks un cleanups on a WES capture bed file}
 \usage{
-EaCoN.BedCheck(bed.file = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.hg19",
+BedCheck(bed.file = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.hg19",
 out.dir = getwd(), return.data = FALSE)
 }
 \arguments{

@@ -1,6 +1,26 @@
 EaCoN
 -----
 
+EaCoN 0.4.0 (2026-06-18) *The Resurrection*
+-----------------
+Maintainer change: Axel Künstner (Universität zu Lübeck) takes over as maintainer.
+Original author: Bastien Job (Gustave Roussy).
+
+CHANGES
+- Requires R >= 4.2.0; support for R < 4.2.0 dropped
+- Replaced iotools/data.table/R.utils with readr and base R connections
+- All require()/suppressPackageStartupMessages() replaced with requireNamespace()
+- Removed stringsAsFactors arguments (obsolete since R 4.0)
+- Fixed sapply(unique(x), which) index-splitting to use split()[unique()],
+  preserving genomic chromosome ordering critical for correct ASCAT segmentation
+- sapply() calls replaced with split()/purrr::map_*() equivalents
+- Fixed metadata() attribution to S4Vectors (not BiocGenerics)
+- Fixed apt.*process() calls via get(..., envir = asNamespace())
+- Fixed cytoband lookup crash for segments at chromosome boundaries
+- Hardened GCnorm.pcs() and l2r.fitloop() against raw-type HDF5 columns
+- Tested on OncoScan/OncoScan_CNV, CytoScan, SNP6 and FACETS/ASCAT/SEQUENZA
+- NOTE: WES data support has not been tested in this release
+
 v0.3.6-2 (20211018) *CloudyMonday2*
 -----------------
 * CORR : Added some fixes that broke SNP6.Process :

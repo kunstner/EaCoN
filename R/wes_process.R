@@ -11,9 +11,6 @@ BINpack.Maker <- function(bed.file = NULL, bin.size = 50, genome.pkg = "BSgenome
   # nthread = 5
   # out.dir = getwd()
   # return.data = FALSE
-  # source("~/git_gustaveroussy/EaCoN/R/BED_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/wes_process.R")
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
   
     ## Checks
   if (is.null(bed.file)) stop("A BED file is required !", call. = FALSE)
@@ -36,10 +33,10 @@ BINpack.Maker <- function(bed.file = NULL, bin.size = 50, genome.pkg = "BSgenome
   
   ### Loading genome
   message(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- metadata(BSg.obj)$genome
-  genome <- metadata(BSg.obj)$genome
+  # genome <- S4Vectors::metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   organism <- BSgenome::organism(BSg.obj)
 
 
@@ -50,7 +47,7 @@ BINpack.Maker <- function(bed.file = NULL, bin.size = 50, genome.pkg = "BSgenome
   message(paste0("Performing binning (", bin.size, ") ..."))
   bed.binned <- bedBinner(bed = bed.clean, bin.size = bin.size, nthread = nthread)
 
-  bed.binned <- data.frame(ProbeSetName = seq_len(nrow(bed.binned)), bed.binned, stringsAsFactors = TRUE)
+  bed.binned <- data.frame(ProbeSetName = seq_len(nrow(bed.binned)), bed.binned)
 
   message("Generating GC% tracks ...")
   wes.gc <- loc.nt.gcc.hs.multi(loc.df = bed.binned, genome.pkg = genome.pkg, extend.multi = extend.multi, blocksize = blocksize, nthread = nthread)
@@ -61,7 +58,7 @@ BINpack.Maker <- function(bed.file = NULL, bin.size = 50, genome.pkg = "BSgenome
   wes.meta.key <- c("genome-species", "genome-version", "genome-package", "array_type", "track_type", "bin_size")
   wes.meta.value <- c(organism, genome, genome.pkg, "WES", "GC", bin.size)
   # renorm.data <- list(tracks = wes.gc, info = list("genome-version" = genome, "genome-package" = genome.pkg, bin.size = bin.size, track.type = "GC"), bed.clean = bed.clean, bed.binned = bed.binned)
-  renorm.data <- list(tracks = wes.gc, info = data.frame(key = wes.meta.key, value = wes.meta.value, stringsAsFactors = FALSE), bed.clean = bed.clean)
+  renorm.data <- list(tracks = wes.gc, info = data.frame(key = wes.meta.key, value = wes.meta.value), bed.clean = bed.clean)
   rm(wes.gc, wes.meta.value, wes.meta.key, bed.clean)
   
   save("renorm.data", file = paste0(out.dir, "/", sub(pattern = "\\.bed$", replacement = paste0("_", genome, "_b", bin.size, ".GC.rda"), x = basename(bed.file), ignore.case = TRUE)), compress = "xz")
@@ -88,11 +85,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
   # return.data = FALSE
   # write.data = TRUE
   # plot = TRUE
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("/home/job/git_gustaveroussy/EaCoN/R/BED_functions.R")
-  # source("/home/job/git_gustaveroussy/EaCoN/R/wes_process.R")
-  # suppressPackageStartupMessages(require(foreach))
-  # require(magrittr)
+  # requireNamespace("foreach", quietly = TRUE)
   
   ## CHECKS (files/parameters)
   if (is.null(BINpack)) stop(tmsg("A BINpack file is required !"), call. = FALSE)
@@ -132,10 +125,10 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
   
   ### Loading genome
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- metadata(BSg.obj)$genome
-  genome <- metadata(BSg.obj)$genome
+  # genome <- S4Vectors::metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   ## Files controls
   tmsg("Checking BINpack and BAMs compatibility ...")
   
@@ -352,7 +345,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
   tmsg("Computing coverages ...")
   gw.rd <- sum(WESobj$RD$end - WESobj$RD$start +1)
   gw.snp <- nrow(WESobj$SNP)
-  rd.cov <- data.frame(cuts = c(1, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200), stringsAsFactors = FALSE)
+  rd.cov <- data.frame(cuts = c(1, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200))
   rd.cov <- cbind(rd.cov, t(foreach::foreach(x = rd.cov$cuts, .combine = "cbind") %do% {
     test.rd.in <- WESobj$RD$tot_count.test >= x
     ref.rd.in <- WESobj$RD$tot_count.ref >= x
@@ -481,9 +474,6 @@ WES.Normalize <- function(data = NULL, BINpack = NULL, gc.renorm = TRUE, wave.re
   # write.data = TRUE
   # plot = TRUE
   # BAF.hetmin <- .33
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("/home/job/git_gustaveroussy/EaCoN/R/renorm_functions.R")
-  # require(foreach)
 
   ### AJOUTER UN CONTROLE DU RDS (pour que ce ne soit pas un _processed.RDS donné en entrée!)
   
@@ -518,11 +508,11 @@ WES.Normalize <- function(data = NULL, BINpack = NULL, gc.renorm = TRUE, wave.re
 
   ### Loading genome
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   # requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- metadata(BSg.obj)$genome
-  genome <- metadata(BSg.obj)$genome
+  # genome <- S4Vectors::metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
 
   ## BAF HANDLING
@@ -745,7 +735,7 @@ WES.Normalize <- function(data = NULL, BINpack = NULL, gc.renorm = TRUE, wave.re
   ## Building ASCAT object
   tmsg("Building normalized object ...")
 
-  my.ch <- sapply(unique(data$RD$chr), function(x) { which(data$RD$chr == x) })
+  my.ch <- split(seq_along(data$RD$chr), as.integer(data$RD$chr))
   
   my.ascat.obj <- list(
     data = list(
@@ -860,7 +850,7 @@ bedBinner <- function(bed = NULL, bin.size = 50, nthread = 1) {
   
   bin.size <- as.integer(bin.size)
   cl <- parallel::makeCluster(spec = nthread, type = "PSOCK", outfile = "")
-  suppressPackageStartupMessages(require(foreach))
+  requireNamespace("foreach", quietly = TRUE)
   doParallel::registerDoParallel(cl)
   k <- 0
   bed.binned <- foreach::foreach(k = unique(bed$chr), .combine = "rbind", .export = "tmsg") %dopar% {
@@ -903,7 +893,7 @@ bedBinner <- function(bed = NULL, bin.size = 50, nthread = 1) {
       }
       # if(length(bin.starts) != length(bin.starts))
       chrs = rep(bedk$chr[b], mod.count)
-      return(data.frame(chr = chrs, start = bin.starts, end = bin.ends, stringsAsFactors = FALSE))
+      return(data.frame(chr = chrs, start = bin.starts, end = bin.ends))
     }
     
     return(bbk)
@@ -932,11 +922,10 @@ loc.nt.count.hs <- function(loc.df = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.
 
   print(paste0("Loading ", genome.pkg, " sequence ..."))
   # requireNamespace(genome.pkg, quietly = TRUE)
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
-  # require(genome.pkg, character.only = TRUE)
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- metadata(BSg.obj)$genome
-  genome <- metadata(BSg.obj)$genome
+  # genome <- S4Vectors::metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
 
 
@@ -979,12 +968,11 @@ loc.nt.count.hs <- function(loc.df = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.
 
 loc.nt.gcc.hs <- function(loc.counts = NULL) {
   gcc <- (loc.counts$C + loc.counts$G) / (loc.counts$A + loc.counts$C + loc.counts$G + loc.counts$T)
-  return(data.frame(loc.counts, GC = gcc, stringsAsFactors = FALSE))
+  return(data.frame(loc.counts, GC = gcc))
 }
 
 ## Compute GC on a (chr, start, end) dataframe using multiple extend values
 loc.nt.gcc.hs.multi <- function(loc.df = NULL, extend.multi = c(50, 100, 200, 400, 800, 1600, 3200, 6400), ...) {
-  # require(foreach)
   requireNamespace("foreach", quietly = TRUE)
   `%do%` <- foreach::"%do%"
   gc.list <- foreach::foreach(nt.add = extend.multi) %do% {
@@ -996,7 +984,7 @@ loc.nt.gcc.hs.multi <- function(loc.df = NULL, extend.multi = c(50, 100, 200, 40
   base.df <- gc.list[[1]][,1:4]
   gc.df <- foreach::foreach(nt.add = seq_along(gc.list), .combine = "cbind") %do% { return(as.integer(round(gc.list[[nt.add]][["GC"]] * 1000))) }
   colnames(gc.df) <- paste0("GC", extend.multi)
-  return(data.frame(base.df, gc.df, stringsAsFactors = FALSE))
+  return(data.frame(base.df, gc.df))
 }
 
 genome.build.finder <- function(BAM.header = NULL, valid.genomes = NULL) {

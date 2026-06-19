@@ -3,6 +3,7 @@ l2r.fitloop <- function(l2rObj, tfd, smo = 399, method = "loess") {
   
   ### FITLOOP
   minitf <- tfd[,-c(1:4), drop = FALSE]
+  if (any(vapply(minitf, is.raw, FALSE))) minitf <- as.data.frame(lapply(minitf, as.numeric))
   tfheads <- colnames(minitf)
   b <- ncol(minitf)+1
   posfit <- c()
@@ -50,14 +51,14 @@ l2r.pcs <- function(l2r, tf, smo) {
   return(list(l2r=l2N, rm.mad=Nrmspread))
 }
 
-GCnorm.pcs <- function(measures=NULL, gc=NULL) {
-  # message("Performing GC PC-scaling ...")
-  gcpc.idx <- sapply(sort(unique(gc)), function(x) { return(which(gc == x)) })
+GCnorm.pcs <- function(measures = NULL, gc = NULL) {
+  gc <- as.numeric(gc)
+  gcpc.idx   <- sapply(sort(unique(gc)), function(x) which(gc == x))
   names(gcpc.idx) <- sort(unique(gc))
-  gcpc.value <- sapply(1:length(gcpc.idx), function(x) { return(measures[gcpc.idx[[x]]]) })
-  gcpc.med <- sapply(gcpc.value, median)
+  gcpc.value <- sapply(seq_along(gcpc.idx), function(x) measures[gcpc.idx[[x]]])
+  gcpc.med   <- sapply(gcpc.value, median)
   measures.new <- rep(NA, length(gc))
-  for (x in 1:length(gcpc.med))  measures.new[gcpc.idx[[x]]] <- measures[gcpc.idx[[x]]] - gcpc.med[x]
+  for (x in seq_along(gcpc.med)) measures.new[gcpc.idx[[x]]] <- measures[gcpc.idx[[x]]] - gcpc.med[x]
   return(measures.new)
 }
 
@@ -83,8 +84,8 @@ renorm.go <- function(input.data = NULL, renorm.rda = NULL, track.type = "GC", s
   input.data <- input.data[input.data$ProbeSetName %in% RNdata$ProbeSetName,]
   # print(str(input.data))
   if (!all(unique(RNdata$ProbeSetName == input.data$ProbeSetName))) stop(tmsg(paste0(track.type, " data and L2R data are not synched, or ordered differently !")), call. = FALSE)
-  # ndata <- data.frame(chr = paste0("chr", input.data$chrs), start = input.data$pos, end = input.data$pos, name = rownames(input.data), RNdata[,-c(1:4), drop = FALSE], stringsAsFactors = FALSE)
-  ndata <- data.frame(chr = input.data$chr, start = input.data$pos, end = input.data$pos, name = input.data$ProbeSetName, RNdata[,-c(1:4), drop = FALSE], stringsAsFactors = FALSE)
+  # ndata <- data.frame(chr = paste0("chr", input.data$chrs), start = input.data$pos, end = input.data$pos, name = rownames(input.data), RNdata[,-c(1:4), drop = FALSE])
+  ndata <- data.frame(chr = input.data$chr, start = input.data$pos, end = input.data$pos, name = input.data$ProbeSetName, RNdata[,-c(1:4), drop = FALSE])
   rm(RNdata, renorm.data)
   # print(str(ndata))
   rm.diff <- diff(as.numeric(runmed(input.data$L2R[!is.na(input.data$L2R)], smo)))

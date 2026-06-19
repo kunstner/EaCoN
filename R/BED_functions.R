@@ -15,7 +15,7 @@ BedGC.fasta <- function(binned.bed.file = NULL, genome = "hg19", fasta = NULL, n
   data(list = genome, package = "chromosomes", envir = environment())
 
   message("Loading BED ...")
-  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#", stringsAsFactors = FALSE)
+  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#")
   if (ncol(bed.data) < 3) stop("BED file must contain at least 3 columns !", call. = FALSE)
   bed.data <- bed.data[,1:3]
   colnames(bed.data) <- c("chr", "start", "end")
@@ -79,17 +79,15 @@ BedGC.fasta.chr <- function(binned.bed.file = NULL, genome = "hg19", fasta.dir =
   data(list = genome, package = "chromosomes", envir = environment())
 
   message("Loading BED ...")
-  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#", stringsAsFactors = FALSE)
+  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#")
   if (ncol(bed.data) < 3) stop("BED file must contain at least 3 columns !", call. = FALSE)
   bed.data <- bed.data[,1:3]
   colnames(bed.data) <- c("chr", "start", "end")
   if (!all(unique(bed.data$chr) %in% cs$chromosomes$chrom)) stop(paste0("BED file contains chromosome(s) not defined in the ", genome, " genome !"), call. = FALSE)
 
-  kcoords <- sapply(unique(bed.data$chr), function(k) { return(bed.data[bed.data$chr == k, ]) }, simplify = FALSE)
+  kcoords <- split(bed.data, bed.data$chr)
 
   message("Starting cluster ...")
-  # require(foreach)
-  # require(doParallel)
   cl <- parallel::makeCluster(spec = nthread, type = "PSOCK")
   doParallel::registerDoParallel(cl)
 
@@ -106,7 +104,6 @@ BedGC.fasta.chr <- function(binned.bed.file = NULL, genome = "hg19", fasta.dir =
       kfafile <- paste0(fasta.dir, "/", kchr, ".fa")
       if (!file.exists(kfafile)) stop(paste0("Could ont find : ", kfafile), call. = FALSE)
       cat("Loading sequence for", kchr, "...\n")
-      # require(Biostrings)
       klen <- Biostrings::fasta.seqlengths(filepath = kfafile)
       kdata <- Biostrings::readDNAStringSet(filepath = kfafile, format = "fasta")
 
@@ -160,13 +157,13 @@ BedGC.R <- function(binned.bed.file = NULL, human.genome.build = "hg19", na.to0 
   if (human.genome.build == "hg38") genome.package <- "BSgenome.Hsapiens.UCSC.hg38"
 
   message("Loading BED ...")
-  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#", stringsAsFactors = FALSE)
+  bed.data <- read.table(file = binned.bed.file, header = FALSE, sep = "\t", comment.char = "#")
   if (ncol(bed.data) < 3) stop("BED file must contain at least 3 columns !", call. = FALSE)
   bed.data <- bed.data[,1:3]
   colnames(bed.data) <- c("chr", "start", "end")
   if (!all(unique(bed.data$chr) %in% cs$chromosomes$chrom)) stop(paste0("BED file contains chromosome(s) not defined in the ", genome, " genome !"), call. = FALSE)
 
-  require(package = genome.package, character.only = TRUE)
+  requireNamespace(genome.package, quietly = TRUE)
   organisms <- ls(paste0("package:",genome.package))
   orga.id <- organisms[length(organisms)]
 
@@ -227,11 +224,11 @@ BedCheck <- function(bed.file = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.hg19"
   message("Checking BED ...")
   # data(list = genome, package = "chromosomes", envir = environment())
   message(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
 
-  bed.data <- read.table(file = bed.file, header = FALSE, sep = "\t", comment.char = "#", stringsAsFactors = TRUE)
+  bed.data <- read.table(file = bed.file, header = FALSE, sep = "\t", comment.char = "#")
   if (ncol(bed.data) < 3) stop("BED file must contain at least 3 columns !", call. = FALSE)
   bed.data <- bed.data[,1:3]
 

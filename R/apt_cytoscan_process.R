@@ -23,9 +23,6 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
   # plot = TRUE
   # force = FALSE
   # genome.pkg = "BSgenome.Hsapiens.UCSC.hg19"
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/renorm_functions.R")
 
 
   
@@ -68,10 +65,10 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
   ## Checking apt-copynumber-cyto-ssa package loc
   apt.cyto.pkg.name <- paste0("apt.cytoscan.", apt.version)
   if (!(apt.cyto.pkg.name %in% installed.packages())) stop(tmsg(paste0("Package ", apt.cyto.pkg.name, " not found !")), call. = FALSE)
-  suppressPackageStartupMessages(require(package = apt.cyto.pkg.name, character.only = TRUE))
+  requireNamespace(apt.cyto.pkg.name, quietly = TRUE)
   
   ## Processing CEL to an OSCHP file
-  oscf <- apt.cytoscan.process(CEL = CEL, samplename = samplename, dual.norm = dual.norm, normal.diploid = normal.diploid, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
+  oscf <- get("apt.cytoscan.process", envir = asNamespace(apt.cyto.pkg.name))(CEL = CEL, samplename = samplename, dual.norm = dual.norm, normal.diploid = normal.diploid, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
   
   ## Reading OSCHP
   my.oschp <- oschp.load(file = oscf)
@@ -82,10 +79,10 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
   
   ### Loading genome info
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome2 <- metadata(BSg.obj)$genome
-  genome2 <- metadata(BSg.obj)$genome
+  # genome2 <- S4Vectors::metadata(BSg.obj)$genome
+  genome2 <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   ### Getting genome build version
@@ -275,14 +272,14 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
       Germline_LogR = NULL,
       Germline_BAF = NULL,
       SNPpos = data.frame(chrs = ao.df$chr, pos = ao.df$pos, row.names = ao.df$ProbeSetName),
-      ch = sapply(unique(ao.df$chr), function(x) { which(ao.df$chr == x) }),
-      chr = sapply(unique(ao.df$chrgap), function(x) { which(ao.df$chrgap == x) }),
+      ch = split(seq_along(ao.df$chr), ao.df$chr)[unique(ao.df$chr)],
+      chr = split(seq_along(ao.df$chrgap), as.integer(ao.df$chrgap))[unique(as.integer(ao.df$chrgap))],
       chrs = unique(ao.df$chr),
       samples = samplename,
       gender = as.vector(meta.b$predicted.gender),
       sexchromosomes = sex.chr,
       failedarrays = NULL,
-      additional = data.frame(RD.test = ao.df$ASignal, RD.ref = ao.df$BSignal, LOR = ao.df$AllelicDifference, LORvar = ao.df$LORvar, stringsAsFactors = FALSE)
+      additional = data.frame(RD.test = ao.df$ASignal, RD.ref = ao.df$BSignal, LOR = ao.df$AllelicDifference, LORvar = ao.df$LORvar)
     ), 
     germline = list(
       germlinegenotypes = matrix(as.logical(ao.df$germ), ncol = 1),

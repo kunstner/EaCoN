@@ -8,7 +8,7 @@
 #   names(Tumor_BAF_noNA) = rownames(ASCATobj$Tumor_BAF)[!is.na(ASCATobj$Tumor_BAF[, 1])]
 #   Tumor_LogR_noNA = ASCATobj$Tumor_LogR[names(Tumor_BAF_noNA), 1]
 #   names(Tumor_LogR_noNA) <- names(Tumor_BAF_noNA)
-#   bafcdf <- data.frame(idx = seq_len(nrow(ASCATobj$Tumor_BAF)), ASCATobj$SNPpos, value = ASCATobj$Tumor_BAF[,1], stringsAsFactors = FALSE)
+#   bafcdf <- data.frame(idx = seq_len(nrow(ASCATobj$Tumor_BAF)), ASCATobj$SNPpos, value = ASCATobj$Tumor_BAF[,1])
 #   tbsm <- bsm <- bafcdf$value
 #   tbsm[which(tbsm < 0)] <- -tbsm[which(tbsm < 0)]
 #   tbsm[which(tbsm > 1)] <- 2 - tbsm[which(tbsm > 1)]
@@ -61,7 +61,7 @@ BAF.Rescale <- function(data = NULL, bafbin.size = 1E+07, toclustname = "BAF", o
   names(Tumor_BAF_noNA) = rownames(data$data$Tumor_BAF)[!is.na(data$data$Tumor_BAF[, 1])]
   Tumor_LogR_noNA = data$data$Tumor_LogR[names(Tumor_BAF_noNA), 1]
   names(Tumor_LogR_noNA) <- names(Tumor_BAF_noNA)
-  bafcdf <- data.frame(idx = seq_len(nrow(data$data$Tumor_BAF)), data$data$SNPpos, value = data$data$Tumor_BAF[,1], stringsAsFactors = FALSE)
+  bafcdf <- data.frame(idx = seq_len(nrow(data$data$Tumor_BAF)), data$data$SNPpos, value = data$data$Tumor_BAF[,1])
   tbsm <- bsm <- bafcdf$value
   tbsm[which(tbsm < 0)] <- -tbsm[which(tbsm < 0)]
   tbsm[which(tbsm > 1)] <- 2 - tbsm[which(tbsm > 1)]
@@ -145,9 +145,6 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
   # genome.pkg = "BSgenome.Hsapiens.UCSC.hg19"
   # BAF.filter <- .90
   # BAF.cutter <- 0
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # require(foreach)
-  # require(mclust)
 
   ## Loading genome data
   if (!genome.pkg %in% BSgenome::installed.genomes()) {
@@ -159,7 +156,7 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
   }
   # data(list = genome, package = "chromosomes", envir = environment())
   message(tmsg(paste0("Loading ", genome.pkg, " ...")))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
@@ -173,7 +170,7 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
   names(Tumor_BAF_noNA) = rownames(ASCATobj$Tumor_BAF)[!is.na(ASCATobj$Tumor_BAF[, 1])]
   Tumor_LogR_noNA = ASCATobj$Tumor_LogR[names(Tumor_BAF_noNA), 1]
   names(Tumor_LogR_noNA) <- names(Tumor_BAF_noNA)
-  bafcdf <- data.frame(idx = seq_len(nrow(ASCATobj$Tumor_BAF)), ASCATobj$SNPpos, value = ASCATobj$Tumor_BAF[,1], stringsAsFactors = FALSE)
+  bafcdf <- data.frame(idx = seq_len(nrow(ASCATobj$Tumor_BAF)), ASCATobj$SNPpos, value = ASCATobj$Tumor_BAF[,1])
   tbsm <- bsm <- bafcdf$value
   tbsm[which(tbsm < 0)] <- -tbsm[which(tbsm < 0)]
   tbsm[which(tbsm > 1)] <- 2 - tbsm[which(tbsm > 1)]

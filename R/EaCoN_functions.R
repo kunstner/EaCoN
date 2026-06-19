@@ -16,9 +16,6 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
   # return.data = FALSE
   # write.data = TRUE
   # plot = TRUE
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/plot_functions.R")
 
   `%do%` <- foreach::"%do%"
 
@@ -46,7 +43,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -95,7 +92,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
   ## Winsorization
   if(!is.null(smooth.k)) {
    tmsg("Smoothing L2R outliers ...")
-    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
     l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
     cndf <- cndf[l2r.nona,]
     cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = smooth.k, tau = 1, verbose = FALSE)
@@ -180,7 +177,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
         denf <- data.frame(x = my.den$x, y = my.den$y, sign = c(1, sign(diff(my.den$y))))
         denf$sign2 <- c(diff(denf$sign), 0)
         rrr <- rle(denf$sign2)
-        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths), stringsAsFactors = F)
+        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths))
         npk <- which(repr$values == -2)
 
         if (length(npk) == 1) {
@@ -188,11 +185,11 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
         } else {
           if (1 %in% npk) npk <- npk[-1]
           if (nrow(repr) %in% npk) npk <- npk[nrow(repr)]
-          parea <- sapply(npk, function(r) { sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]])/sum(my.den$y) })
+          parea <- purrr::map_dbl(npk, function(r) sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]]) / sum(my.den$y))
           parea.rel <- parea/max(parea)
           npk <- npk[parea > 0.1]
           peaklist <- repr$start[npk]
-          shifter <- denf$x[peaklist[which.min(sapply(peaklist, function(p) { abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)]))/sum(denf$y) }))]]
+          shifter <- denf$x[peaklist[which.min(purrr::map_dbl(peaklist, function(p) abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)])) / sum(denf$y)))]]
         }
       }
     }
@@ -205,7 +202,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
 
   ## Winsorization (for aesthetics)
   tmsg("Smoothing L2R (for plots)...")
-  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
   l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
   cndf <- cndf[l2r.nona,]
   cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = 5, tau = 1, verbose = FALSE)
@@ -262,7 +259,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
 
   bafkend <- vapply(unique(bafpos$chrs), function(x) { max(which(bafpos$chrs == x))}, 1)
   bafbreaks <- cumsum(rle(bafpos$BAF)$lengths)
-  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))), stringsAsFactors = FALSE)
+  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))))
   baf.seg$start.idx <- c(1, baf.seg$end.idx[-nrow(baf.seg)]+1)
   baf.seg$length.idx <- baf.seg$end.idx - baf.seg$start.idx +1
   baf.seg$start.probeset <- bafpos$ProbeSet[baf.seg$start.idx]
@@ -295,7 +292,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
   tmsg("Calling L2R ...")
   l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
-    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values, stringsAsFactors = FALSE)
+    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
     probecs <- cumsum(segdf$Probes)
@@ -339,7 +336,7 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
   loss.idx <- which(l2r.segments$Value < l.cut)
   normal.idx <- which(l2r.segments$Value >= l.cut & l2r.segments$Value <= g.cut)
   tmsg("Writing CBS files ...")
-  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)], stringsAsFactors = FALSE)
+  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)])
   colnames(data$cbs$nocut) <- c(samplename, "Chr", "Start", "End", "Probes", "Log2Ratio")
   my.cbs.cut <- data$cbs$nocut
   my.cbs.cut$Log2Ratio[my.cbs.cut$Log2Ratio > l.cut & my.cbs.cut$Log2Ratio < g.cut] <- 0
@@ -359,14 +356,12 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
     l2r.value <- data.frame(Chr = l2r.chr,
                             Start = as.integer(data$data$SNPpos$pos),
                             End = as.integer(data$data$SNPpos$pos),
-                            Value = data$data$Tumor_LogR_wins[,1],
-                            # Value = data$data$Tumor_LogR[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_LogR_wins[,1])
+                            # Value = data$data$Tumor_LogR[,1])
     baf.value <- data.frame(Chr = l2r.chr,
                             Start = as.integer(data$data$SNPpos$pos),
                             End = as.integer(data$data$SNPpos$pos),
-                            Value = data$data$Tumor_BAF[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_BAF[,1])
 
     png(paste0(samplename, ".SEG.ASCAT.png"), width = 1850, height = 980)
     par(mar = c(1, 6, 3, 1), mfrow = c(2, 1))
@@ -418,10 +413,6 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
   # write.data = TRUE
   # plot = TRUE
   # force = FALSE
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/plot_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/FACETS_hack.R")
 
 
   calling.method <- tolower(calling.method)
@@ -450,7 +441,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -484,7 +475,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
   ## Winsorization
    if(!is.null(smooth.k)) {
     tmsg("Smoothing L2R outliers ...")
-    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
     l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
     cndf <- cndf[l2r.nona,]
     cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = smooth.k, tau = 1, verbose = FALSE)
@@ -610,7 +601,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
         denf <- data.frame(x = my.den$x, y = my.den$y, sign = c(1, sign(diff(my.den$y))))
         denf$sign2 <- c(diff(denf$sign), 0)
         rrr <- rle(denf$sign2)
-        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths), stringsAsFactors = F)
+        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths))
         npk <- which(repr$values == -2)
 
         if (length(npk) == 1) {
@@ -618,11 +609,11 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
         } else {
           if (1 %in% npk) npk <- npk[-1]
           if (nrow(repr) %in% npk) npk <- npk[nrow(repr)]
-          parea <- sapply(npk, function(r) { sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]])/sum(my.den$y) })
+          parea <- purrr::map_dbl(npk, function(r) sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]]) / sum(my.den$y))
           parea.rel <- parea/max(parea)
           npk <- npk[parea > 0.1]
           peaklist <- repr$start[npk]
-          shifter <- denf$x[peaklist[which.min(sapply(peaklist, function(p) { abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)]))/sum(denf$y) }))]]
+          shifter <- denf$x[peaklist[which.min(purrr::map_dbl(peaklist, function(p) abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)])) / sum(denf$y)))]]
         }
       }
     }
@@ -635,7 +626,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
 
   ## Winsorization (for aesthetics)
   tmsg("Smoothing L2R (for plots)...")
-  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
   l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
   cndf <- cndf[l2r.nona,]
   cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = 5, tau = 1, verbose = FALSE)
@@ -693,7 +684,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
 
   bafkend <- vapply(unique(bafpos$chrs), function(x) { max(which(bafpos$chrs == x))}, 1)
   bafbreaks <- cumsum(rle(bafpos$BAF)$lengths)
-  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))), stringsAsFactors = FALSE)
+  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))))
   baf.seg$start.idx <- c(1, baf.seg$end.idx[-nrow(baf.seg)]+1)
   baf.seg$length.idx <- baf.seg$end.idx - baf.seg$start.idx +1
   baf.seg$start.probeset <- bafpos$ProbeSet[baf.seg$start.idx]
@@ -726,7 +717,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
   tmsg("Calling L2R ...")
   l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
-    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values, stringsAsFactors = FALSE)
+    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
     # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
@@ -771,7 +762,7 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
   loss.idx <- which(l2r.segments$Value < l.cut)
   normal.idx <- which(l2r.segments$Value >= l.cut & l2r.segments$Value <= g.cut)
   tmsg("Writing CBS files ...")
-  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)], stringsAsFactors = FALSE)
+  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)])
   colnames(data$cbs$nocut) <- c(samplename, "Chr", "Start", "End", "Probes", "Log2Ratio")
   my.cbs.cut <- data$cbs$nocut
   my.cbs.cut$Log2Ratio[my.cbs.cut$Log2Ratio > l.cut & my.cbs.cut$Log2Ratio < g.cut] <- 0
@@ -793,15 +784,13 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
     l2r.value <- data.frame(Chr = l2r.chr,
                             Start = data$data$SNPpos$pos,
                             End = data$data$SNPpos$pos,
-                            Value = data$data$Tumor_LogR_wins[,1],
-                            # Value = data$data$Tumor_LogR[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_LogR_wins[,1])
+                            # Value = data$data$Tumor_LogR[,1])
     # baf.chr <- if(length(grep(pattern = "chr", x = names(cs$chrom2chr), ignore.case = TRUE)) > 0) unlist(cs$chrom2chr[paste0("chr", as.character(data$data$SNPpos$chrs))]) else unlist(cs$chrom2chr[as.character(data$data$SNPpos$chrs)])
     baf.value <- data.frame(Chr = l2r.chr,
                             Start = data$data$SNPpos$pos,
                             End = data$data$SNPpos$pos,
-                            Value = data$data$Tumor_BAF[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_BAF[,1])
 
     png(paste0(samplename, ".SEG.FACETS.png"), width = 1850, height = 980)
     par(mar = c(1, 6, 3, 1), mfrow = c(2, 1))
@@ -851,9 +840,6 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   # write.data = TRUE
   # plot = TRUE
   # force = FALSE
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/plot_functions.R")
 
   calling.method <- tolower(calling.method)
 
@@ -880,7 +866,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -914,7 +900,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   ## Winsorization
   if(!is.null(smooth.k)) {
     tmsg("Smoothing L2R outliers ...")
-    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+    cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
     l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
     cndf <- cndf[l2r.nona,]
     cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = smooth.k, tau = 1, verbose = FALSE)
@@ -955,10 +941,10 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
 
   ### Data conversion
   tpos <- as.integer(unlist(cs$chrom2chr[as.character(data$data$SNPpos$chrs)]))
-  l2r.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = data$data$Tumor_LogR[,1], stringsAsFactors = FALSE)
+  l2r.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = data$data$Tumor_LogR[,1])
   tbaf <- data$data$Tumor_BAF[,1]
   tbaf[data$germline$germlinegenotypes] <- 0
-  baf.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = tbaf, stringsAsFactors = FALSE)
+  baf.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = tbaf)
   colnames(l2r.df)[3] <- colnames(baf.df)[3] <- samplename
 
   ### Blanking bins uncovered by BAF
@@ -974,7 +960,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
 
   # ### Data conversion
   # tpos <- as.integer(unlist(cs$chrom2chr[as.character(data$data$SNPpos$chrs)]))
-  # l2r.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = data$data$Tumor_LogR[,1], stringsAsFactors = FALSE)
+  # l2r.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = data$data$Tumor_LogR[,1])
   #
   # ### Imputing missing L2R values
   # if(any(is.na(l2r.df[,3]))) {
@@ -990,7 +976,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   # p.keep[is.na(tbaf)] <- TRUE
   # p.keep[k.edges] <- FALSE
   #
-  # baf.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = tbaf, stringsAsFactors = FALSE)
+  # baf.df <- data.frame(chrs = tpos, pos = as.integer(data$data$SNPpos$pos), s1 = tbaf)
   # colnames(l2r.df)[3] <- colnames(baf.df)[3] <- samplename
   #
   # # isna <- is.na(baf.df[[samplename]])
@@ -1053,7 +1039,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
         denf <- data.frame(x = my.den$x, y = my.den$y, sign = c(1, sign(diff(my.den$y))))
         denf$sign2 <- c(diff(denf$sign), 0)
         rrr <- rle(denf$sign2)
-        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths), stringsAsFactors = F)
+        repr <- data.frame(values = rrr$values, start = c(0, (cumsum(rrr$lengths[-c(length(rrr$lengths))]) + 1)), end = cumsum(rrr$lengths))
         npk <- which(repr$values == -2)
 
         if (length(npk) == 1) {
@@ -1061,11 +1047,11 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
         } else {
           if (1 %in% npk) npk <- npk[-1]
           if (nrow(repr) %in% npk) npk <- npk[nrow(repr)]
-          parea <- sapply(npk, function(r) { sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]])/sum(my.den$y) })
+          parea <- purrr::map_dbl(npk, function(r) sum(my.den$y[repr$start[r - 1]:repr$end[r + 1]]) / sum(my.den$y))
           parea.rel <- parea/max(parea)
           npk <- npk[parea > 0.1]
           peaklist <- repr$start[npk]
-          shifter <- denf$x[peaklist[which.min(sapply(peaklist, function(p) { abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)]))/sum(denf$y) }))]]
+          shifter <- denf$x[peaklist[which.min(purrr::map_dbl(peaklist, function(p) abs(sum(denf$y[1:(p - 1)]) - sum(denf$y[(p + 1):nrow(denf)])) / sum(denf$y)))]]
         }
       }
     }
@@ -1078,7 +1064,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
 
   ## Winsorization (for aesthetics)
   tmsg("Smoothing L2R (for plots)...")
-  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]], stringsAsFactors = FALSE)
+  cndf <- data.frame(Chr = rep(unlist(cs$chrom2chr[data$data$chrs]), vapply(data$data$ch, length, 1L)), Position = unlist(data$data$ch), MySample = data$data$Tumor_LogR[[1]])
   l2r.nona <- !is.na(data$data$Tumor_LogR[[1]])
   cndf <- cndf[l2r.nona,]
   cndf.wins <- copynumber::winsorize(data = cndf, pos.unit = "bp", method = "mad", k = 5, tau = 1, verbose = FALSE)
@@ -1134,7 +1120,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
 
   bafkend <- vapply(unique(bafpos$chrs), function(x) { max(which(bafpos$chrs == x))}, 1)
   bafbreaks <- cumsum(rle(bafpos$BAF)$lengths)
-  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))), stringsAsFactors = FALSE)
+  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))))
   baf.seg$start.idx <- c(1, baf.seg$end.idx[-nrow(baf.seg)]+1)
   baf.seg$length.idx <- baf.seg$end.idx - baf.seg$start.idx +1
   baf.seg$start.probeset <- bafpos$ProbeSet[baf.seg$start.idx]
@@ -1167,7 +1153,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   tmsg("Calling L2R ...")
   l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
-    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values, stringsAsFactors = FALSE)
+    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
     # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
@@ -1212,7 +1198,7 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   loss.idx <- which(l2r.segments$Value < l.cut)
   normal.idx <- which(l2r.segments$Value >= l.cut & l2r.segments$Value <= g.cut)
   tmsg("Writing CBS files ...")
-  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)], stringsAsFactors = FALSE)
+  data$cbs$nocut <- data.frame(Samplename = samplename, l2r.segments[,c(1, 3, 4, 6, 5)])
   colnames(data$cbs$nocut) <- c(samplename, "Chr", "Start", "End", "Probes", "Log2Ratio")
   my.cbs.cut <- data$cbs$nocut
   my.cbs.cut$Log2Ratio[my.cbs.cut$Log2Ratio > l.cut & my.cbs.cut$Log2Ratio < g.cut] <- 0
@@ -1234,15 +1220,13 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
     l2r.value <- data.frame(Chr = l2r.chr,
                             Start = data$data$SNPpos$pos,
                             End = data$data$SNPpos$pos,
-                            Value = data$data$Tumor_LogR_wins[,1],
-                            # Value = data$data$Tumor_LogR[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_LogR_wins[,1])
+                            # Value = data$data$Tumor_LogR[,1])
     # baf.chr <- if(length(grep(pattern = "chr", x = names(cs$chrom2chr), ignore.case = TRUE)) > 0) unlist(cs$chrom2chr[paste0("chr", as.character(data$data$SNPpos$chrs))]) else unlist(cs$chrom2chr[as.character(data$data$SNPpos$chrs)])
     baf.value <- data.frame(Chr = l2r.chr,
                             Start = data$data$SNPpos$pos,
                             End = data$data$SNPpos$pos,
-                            Value = data$data$Tumor_BAF[,1],
-                            stringsAsFactors = FALSE)
+                            Value = data$data$Tumor_BAF[,1])
 
     png(paste0(samplename, ".SEG.SEQUENZA.png"), width = 1850, height = 980)
     par(mar = c(1, 6, 3, 1), mfrow = c(2, 1))
@@ -1316,8 +1300,6 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
   # cluster.type = "PSOCK"
   # out.dir <- "/mnt/data_cigogne/job/PUBLI_EaCoN/TCGA/ANALYSES/EaCoN_0.3.0_beta1/WES/TCGA-A7-A0CE-01A_vs_10A"
   # force <- TRUE
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # require(foreach)
 
 
   ## CHECKS
@@ -1342,7 +1324,7 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -1380,7 +1362,8 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
       # wt.tcn <- my.tcn * (my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1)
       # sum(wt.tcn) / sum(my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1)
 
-      tcn.tbl.ung <- tibble::as_tibble(cbind(my.ascat.seg.ascn$segments, nTotal = my.ascat.seg.ascn$segments$nMajor + my.ascat.seg.ascn$segments$nMinor, width = my.ascat.seg.ascn$segments$endpos - my.ascat.seg.ascn$segments$startpos + 1))
+      tcn.tbl.ung <- tibble::as_tibble(my.ascat.seg.ascn$segments) |>
+        dplyr::mutate(nTotal = nMajor + nMinor, width = endpos - startpos + 1L)
       tcn.tbl <- dplyr::group_by(tcn.tbl.ung, nTotal)
       tcn.tbl.prop <- dplyr::summarise(tcn.tbl, tot_width = sum(width))
       ascat.ploidy <- my.ascat.seg.ascn$ploidy
@@ -1414,7 +1397,7 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
 
       ## Generating cellularity + ploidy + metrics file
       outfile <- paste0(samplename, ".gamma", gamma, "_model.txt")
-      modeldf <- data.frame(key = c("Sample", "Gamma", "Goodness.of.Fit", "Psi", "Ploidy.ASCAT", "Ploidy.Median", "Ploidy.Most.Width", "Ploidy.Width.weighted", "Cellularity"), value = c(samplename, gamma, unname(my.ascat.seg.ascn$goodnessOfFit), unname(my.ascat.seg.ascn$psi), my.ascat.seg.ascn$ploidy$ascat, my.ascat.seg.ascn$ploidy$median, my.ascat.seg.ascn$ploidy$most.width, my.ascat.seg.ascn$ploidy$width.weighted, unname(my.ascat.seg.ascn$aberrantcellfraction)), stringsAsFactors = FALSE)
+      modeldf <- data.frame(key = c("Sample", "Gamma", "Goodness.of.Fit", "Psi", "Ploidy.ASCAT", "Ploidy.Median", "Ploidy.Most.Width", "Ploidy.Width.weighted", "Cellularity"), value = c(samplename, gamma, unname(my.ascat.seg.ascn$goodnessOfFit), unname(my.ascat.seg.ascn$psi), my.ascat.seg.ascn$ploidy$ascat, my.ascat.seg.ascn$ploidy$median, my.ascat.seg.ascn$ploidy$most.width, my.ascat.seg.ascn$ploidy$width.weighted, unname(my.ascat.seg.ascn$aberrantcellfraction)))
       write.table.fast(x = modeldf, file = outfile, header = FALSE)
 
       ## Reploting
@@ -1568,7 +1551,7 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
       setwd(oridirx)
       return(unname(c(gamma, unlist(my.ascat.seg.ascn$ploidy, use.names = FALSE), my.ascat.seg.ascn$aberrantcellfraction, my.ascat.seg.ascn$goodnessOfFit, my.ascat.seg.ascn$psi)))
     }
-  }, stringsAsFactors = FALSE)
+  })
   parallel::stopCluster(cls)
   
   # rownames(fit.val) <- gammavec
@@ -1615,8 +1598,6 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
   # data <- readRDS("A18R.11.17.18.SEG.FACETS.RDS")
   # out.dir <- "/home/job/Documents/ROSCOFF/Roscoff_2018/TP_CNV/WES/REDUX/A18R.11.17.18"
   # force <- TRUE
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # require(foreach)
 
 
   ## CHECKS
@@ -1641,7 +1622,7 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -1654,7 +1635,8 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
   if (!"loglik" %in% names(ascn.res)) ascn.res$loglik <- NA
 
   ## Handling ploidy
-  tcn.tbl.ung <- tibble::as_tibble(cbind(ascn.res$cncf, width = ascn.res$cncf$end - ascn.res$cncf$start + 1))
+  tcn.tbl.ung <- tibble::as_tibble(ascn.res$cncf) |>
+  dplyr::mutate(width = end - start + 1L)
   tcn.tbl <- dplyr::group_by(tcn.tbl.ung, tcn.em)
   tcn.tbl.prop <- dplyr::summarise(tcn.tbl, tot_width = sum(width))
 
@@ -1689,7 +1671,7 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
   outfile <- paste0(samplename, "_model.txt")
   modeldf <- data.frame(
     key =   c("Sample", "LogLik", "dipLogR", "emFlags", "Ploidy.FACETS", "Ploidy.Median", "Ploidy.Most.Width", "Ploidy.Width.weighted", "Cellularity"),
-    value = c(samplename, ascn.res$loglik, ascn.res$dipLogR, if(is.null(ascn.res$emflags)) "NA" else ascn.res$emflags, ascn.res$ploidy$facets, ascn.res$ploidy$median, ascn.res$ploidy$most.width, ascn.res$ploidy$width.weighted, ascn.res$purity), stringsAsFactors = FALSE)
+    value = c(samplename, ascn.res$loglik, ascn.res$dipLogR, if(is.null(ascn.res$emflags)) "NA" else ascn.res$emflags, ascn.res$ploidy$facets, ascn.res$ploidy$median, ascn.res$ploidy$most.width, ascn.res$ploidy$width.weighted, ascn.res$purity))
   write.table.fast(x = modeldf, file = outfile, header = FALSE)
 
   ## Plots
@@ -1797,7 +1779,6 @@ ASCN.SEQUENZA <- function(data = NULL, max.ploidy = 4, ploidy.step = .1, seg.min
   # seg.min.size = 1E+06
   # out.dir = getwd()
   # force = TRUE
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
 
   ## CHECKS
   if (!is.list(data)) stop(tmsg("data should be a list !"), call. = FALSE)
@@ -1825,7 +1806,7 @@ ASCN.SEQUENZA <- function(data = NULL, max.ploidy = 4, ploidy.step = .1, seg.min
     }
   }
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
   cs <- chromobjector(BSg.obj)
 
@@ -1908,7 +1889,7 @@ ASCN.SEQUENZA <- function(data = NULL, max.ploidy = 4, ploidy.step = .1, seg.min
   outfile <- paste0(samplename, "_model.txt")
   modeldf <- data.frame(
     key =   c("Sample", "Ploidy.SEQUENZA", "Ploidy.Median", "Ploidy.Most.Width", "Ploidy.Width.weighted", "Cellularity"),
-    value = c(samplename, ascn.res$ploidy$sequenza, ascn.res$ploidy$median, ascn.res$ploidy$most.width, ascn.res$ploidy$width.weighted, ascn.res$purity), stringsAsFactors = FALSE)
+    value = c(samplename, ascn.res$ploidy$sequenza, ascn.res$ploidy$median, ascn.res$ploidy$most.width, ascn.res$ploidy$width.weighted, ascn.res$purity))
   write.table.fast(x = modeldf, file = outfile, header = FALSE)
 
   ## Plots
@@ -2035,9 +2016,6 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   # solo = FALSE
   # report = TRUE
   # ldb = "/mnt/data_cigogne/bioinfo/"
-  # source("/home/job/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("/home/job/git_gustaveroussy/EaCoN/R/plot_functions.R")
-  # require(foreach)
 
   oridir <- getwd()
 
@@ -2076,7 +2054,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
       rg.k <- rg.df[rg.df$chrom == k, ]
       rg.gr <- GenomicRanges::GRanges(seqnames = rg.k$name2, IRanges::IRanges(rg.k$txStart, rg.k$txEnd), strand = rg.k$strand)
       rdx.k <- as.data.frame(GenomicRanges::reduce(rg.gr, ignore.strand = FALSE))
-      rdx.df <- data.frame(symbol = as.character(rdx.k$seqnames), chrom = k, chrN = as.numeric(cs$chrom2chr[k]), start = rdx.k$start, end = rdx.k$end, width = rdx.k$width, strand = as.character(rdx.k$strand), stringsAsFactors = FALSE)
+      rdx.df <- data.frame(symbol = as.character(rdx.k$seqnames), chrom = k, chrN = as.numeric(cs$chrom2chr[k]), start = rdx.k$start, end = rdx.k$end, width = rdx.k$width, strand = as.character(rdx.k$strand))
       return(rdx.df)
     }
     gen.df <- gen.df[order(gen.df$chrN, gen.df$start, gen.df$end),]
@@ -2086,13 +2064,13 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   cbs.df <- foreach::foreach(seg = 1:nrow(data$cbs$cut), .combine = "rbind") %do% {
     ingenz <- if(exists("gen.df")) gen.df$symbol[gen.df$chrN == data$cbs$cut$Chr[seg] & gen.df$start <= data$cbs$cut$End[seg] & gen.df$end >= data$cbs$cut$Start[seg]] else ingenz <- "NA"
     ingenz.len <- if(exists("gen.df")) length(ingenz) else "NA"
-    return(data.frame(data$cbs$cut[seg, ], Genes = ingenz.len, Symbol = paste0(ingenz, collapse = ","), stringsAsFactors = FALSE))
+    return(data.frame(data$cbs$cut[seg, ], Genes = ingenz.len, Symbol = paste0(ingenz, collapse = ",")))
   }
 
   tmsg("Building L2R segmentation table ...")
   l2r.segments <- foreach::foreach(k = 1:length(my.ascat.seg$ch), .combine = "rbind") %do% {
     segrle <- rle(my.ascat.seg$Tumor_LogR_segmented[my.ascat.seg$ch[[k]],1])
-    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values, stringsAsFactors = FALSE)
+    segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
     # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- my.ascat.seg$chrs[[k]]
@@ -2111,7 +2089,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   bafpos$chrs <- as.character(bafpos$chrs)
   bafkend <- vapply(unique(bafpos$chrs), function(x) { max(which(bafpos$chrs == x))}, 1)
   bafbreaks <- cumsum(rle(bafpos$BAF)$lengths)
-  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))), stringsAsFactors = FALSE)
+  baf.seg <- data.frame(end.idx = sort(unique(c(bafkend, bafbreaks))))
   baf.seg$start.idx <- c(1, baf.seg$end.idx[-nrow(baf.seg)]+1)
   baf.seg$length.idx <- baf.seg$end.idx - baf.seg$start.idx +1
   baf.seg$start.probeset <- bafpos$ProbeSet[baf.seg$start.idx]
@@ -2190,10 +2168,9 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
 
   tmsg("Building Truncated table ...")
   # gen.trunk.idx <- which(gen.df$chrN == cbsNC.df$Chr & gen.df$start < cbsNC.df$End & gen.df & gen.df$end > cbsNC.df$Start)
-  gen.trunk.idx.list <- sapply(1:nrow(gen.df), function(g) {
+  gen.trunk.idx.list <- purrr::map_int(seq_len(nrow(gen.df)), function(g) {
     gidx <- which(cbsNC.df$Chr == gen.df$chrN[g] & ((cbsNC.df$Start > gen.df$start[g] & cbsNC.df$Start < gen.df$end[g]) | (cbsNC.df$End > gen.df$start[g] & cbsNC.df$End < gen.df$end[g])))
-    return(length(gidx))
-    # if(length(gen.trunk.idx) > 0) return(gidx) else return(NULL)
+    length(gidx)
   })
   gen.trunk.idx <- which(gen.trunk.idx.list > 1)
   if (length(gen.trunk.idx) > 0) {
@@ -2219,7 +2196,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
           return(cbind(trunc.regz[g,c(1:6)], match.start = match.start, match.end = match.end, match.width = match.end - match.start +1, trunc.regz[g,c(10,9,11)], baf.seg[gg,c(12,11)], bafwidth = baf.seg$End[gg] - baf.seg$Start[gg] + 1))
         }
       } else {
-        ginreg <- data.frame(trunc.regz[g,c(1:8)], match.width = trunc.regz$match.end[g] - trunc.regz$match.start[g] + 1, trunc.regz[g,c(10,9,11)], Status = NA, Value = NA, bafwidth = NA, stringsAsFactors = FALSE, check.names = FALSE)
+        ginreg <- data.frame(trunc.regz[g,c(1:8)], match.width = trunc.regz$match.end[g] - trunc.regz$match.start[g] + 1, trunc.regz[g,c(10,9,11)], Status = NA, Value = NA, bafwidth = NA, check.names = FALSE)
       }
       return(ginreg)
     }
@@ -2280,8 +2257,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
                 "SNPQC",
                 "WavinessSd",
                 "Predicted Gender"
-        ),
-        stringsAsFactors = FALSE
+        )
       )
 
       chip.list <- names(data$meta$affy)[names(data$meta$affy) != "analysis"]
@@ -2291,7 +2267,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
         } else if (meta.tags$entry[t] %in% c("eacon", "basic")) {
           ext.meta <- getmeta(key = meta.tags$key[t], meta = data$meta[[meta.tags$entry[t]]])
         } else {
-          ext.meta <- paste0(sapply(chip.list, function(p) { getmeta(key = meta.tags$key[t], meta = data$meta$affy[[p]][[meta.tags$entry[t]]])}), collapse = " ")
+          ext.meta <- paste0(purrr::map_chr(chip.list, function(p) getmeta(key = meta.tags$key[t], meta = data$meta$affy[[p]][[meta.tags$entry[t]]])), collapse = " ")
         }
         return(ext.meta)
       }
@@ -2316,13 +2292,13 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
       }
       dev.off()
       intplotf <- tools::file_path_as_absolute(intplotf)
-      # meta.tags <- rbind(meta.tags, data.frame(key = c("a2p-cel-median-intensity", "a2p-cel-outliers", "a2p-cel-outliers-pc"), sig = c("Median Raw Intensity", "# Outliers", "Outliers (%)"), val = c(celobj$int.median, celobj$n.outliers, paste0(round(celobj$pc.outliers / 100, digits = 3), " %")), stringsAsFactors = FALSE))
+      # meta.tags <- rbind(meta.tags, data.frame(key = c("a2p-cel-median-intensity", "a2p-cel-outliers", "a2p-cel-outliers-pc"), sig = c("Median Raw Intensity", "# Outliers", "Outliers (%)"), val = c(celobj$int.median, celobj$n.outliers, paste0(round(celobj$pc.outliers / 100, digits = 3), " %"))))
 
       ## Building array & QC tables
       tmsg("Building Array & QC tables ...")
-      array.df <- data.frame(t(meta.tags$val[1:6]), stringsAsFactors = FALSE)
+      array.df <- data.frame(t(meta.tags$val[1:6]))
       colnames(array.df) <- meta.tags$sig[1:6]
-      qc.df <- data.frame(t(meta.tags$val[7:11]), stringsAsFactors = FALSE)
+      qc.df <- data.frame(t(meta.tags$val[7:11]))
       colnames(qc.df) <- meta.tags$sig[7:11]
       qc.df[["Median Raw Intensity"]] <- paste0(vapply(chip.list, function(p) { return(median(data$CEL[[p]]$intensities, na.rm = TRUE)) }, 1), collapse = " ; ")
       qc.df[["Outlier Probes"]] <- paste0(vapply(chip.list, function(p) { return(length(data$CEL[[p]]$outliers)) }, 1), collapse = " ; ")
@@ -2352,8 +2328,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
     l2r.value <- data.frame(Chr = l2r.chr,
                             Start = my.ascat.seg$SNPpos$pos,
                             End = my.ascat.seg$SNPpos$pos,
-                            Value = my.ascat.seg$Tumor_LogR_wins[,1],
-                            stringsAsFactors = FALSE)
+                            Value = my.ascat.seg$Tumor_LogR_wins[,1])
     genome.pkg <- data$meta$basic$genome.pkg
 
     # png(paste0(out.dir, "/", samplename, ".L2R.G.png"), width = 1850, height = 980)
@@ -2376,8 +2351,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
     baf.value <- data.frame(Chr = baf.chr,
                             Start = my.ascat.seg$SNPpos$pos,
                             End = my.ascat.seg$SNPpos$pos,
-                            Value = my.ascat.seg$Tumor_BAF[,1],
-                            stringsAsFactors = FALSE)
+                            Value = my.ascat.seg$Tumor_BAF[,1])
 
     # png(paste0(out.dir, "/", samplename, ".BAF.png"), width = 1850, height = 980)
     png(paste0(samplename, ".BAF.png"), width = 1850, height = 980)
@@ -2426,7 +2400,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
 
     ## Instability metrics
     tmsg("Building instability metrics table ...")
-    gi.df <- data.frame(Status = c("Gain", "Loss", "Aberrant (Gain + Loss)", "Normal", "TOTAL"), stringsAsFactors = FALSE)
+    gi.df <- data.frame(Status = c("Gain", "Loss", "Aberrant (Gain + Loss)", "Normal", "TOTAL"))
     gi.idx <- list(gi.gain.idx = gain.idx,
                    gi.loss.idx = loss.idx,
                    gi.aberrant.idx = sort(c(gain.idx, loss.idx)),
@@ -2456,11 +2430,13 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
     segtab.df$Width <- segtab.df$End - segtab.df$Start +1
     segtab.df$Start.band <- vapply(1:nrow(segtab.df), function(x) {
       scb <- cs$cytobands$chrN == segtab.df$Chr[x] & cs$cytobands$start <= segtab.df$Start[x] & cs$cytobands$end >= segtab.df$Start[x]
-      return(paste0(cs$cytobands$chrA[scb], cs$cytobands$cytoband[scb]))
+      res <- paste0(cs$cytobands$chrA[scb], cs$cytobands$cytoband[scb])
+      if (length(res) == 0L) NA_character_ else res
     }, "a")
     segtab.df$End.band <- vapply(1:nrow(segtab.df), function(x) {
       ecb <- cs$cytobands$chrN == segtab.df$Chr[x] & cs$cytobands$start <= segtab.df$End[x] & cs$cytobands$end >= segtab.df$End[x]
-      return(paste0(cs$cytobands$chrA[ecb], cs$cytobands$cytoband[ecb]))
+      res <- paste0(cs$cytobands$chrA[ecb], cs$cytobands$cytoband[ecb])
+      if (length(res) == 0L) NA_character_ else res
     }, "a")
     segtab.df$Status <- "Normal"
     segtab.df$Status[gain.idx] <- "Gain"
@@ -2499,7 +2475,7 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
     }, "a")
     segbaf.df <- foreach::foreach(seg = 1:nrow(segbaf.df), .combine = "rbind") %do% {
       ingenz <- gen.df$symbol[gen.df$chrN == segbaf.df$Chr[seg] & gen.df$start <= segbaf.df$End[seg] & gen.df$end >= segbaf.df$Start[seg]]
-      return(data.frame(segbaf.df[seg, ], Genes = length(ingenz), Symbol = paste0(ingenz, collapse = ","), stringsAsFactors = FALSE))
+      return(data.frame(segbaf.df[seg, ], Genes = length(ingenz), Symbol = paste0(ingenz, collapse = ",")))
     }
     segbaf.df <- segbaf.df[,c(13,8:10,14,15,12,11,3,16,17)]
     colnames(segbaf.df) <- c("Chr", "Start", "End", "Width", "Start Cytoband", "End Cytoband", "Status", "BAF", "# Markers", "# Genes", "symbols")
@@ -2628,7 +2604,7 @@ Annotate.solo <- function(cbs.file = NULL, genome = NULL, ldb = "/mnt/data_cigog
   data(list = genome, package = self.pkg.name, envir = environment())
   ## Converting CBS to SOLO
   message(tmsg(" Converting to SOLO ..."))
-  solo.df <- data.frame(Loc = paste0(unlist(cs$chr2chrom[cbs.df$Chr]), ":", cbs.df$Start, "-", cbs.df$End), Probes = cbs.df$Probes, Status = sign(cbs.df$Log2Ratio), L2R = cbs.df$Log2Ratio, Ratio = 2^cbs.df$Log2Ratio, stringsAsFactors = FALSE)
+  solo.df <- data.frame(Loc = paste0(unlist(cs$chr2chrom[cbs.df$Chr]), ":", cbs.df$Start, "-", cbs.df$End), Probes = cbs.df$Probes, Status = sign(cbs.df$Log2Ratio), L2R = cbs.df$Log2Ratio, Ratio = 2^cbs.df$Log2Ratio)
   solo.df <- solo.df[!solo.df$Status == 0,]
   solo.df$Status[solo.df$Status == 1] <- "G"
   solo.df$Status[solo.df$Status == -1] <- "L"

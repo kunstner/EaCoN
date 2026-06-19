@@ -1,8 +1,8 @@
-\name{EaCoN.BedGC.fasta}
-\alias{EaCoN.BedGC.fasta}
+\name{BedGC.fasta}
+\alias{BedGC.fasta}
 \title{Compute GC-content of genomic regions defined by a BED file using a single genomic FASTA file.}
 \usage{
-EaCoN.BedGC.fasta(binned.bed.file = NULL, genome = "hg19", fasta = NULL, na.to0 = TRUE,
+BedGC.fasta(binned.bed.file = NULL, genome = "hg19", fasta = NULL, na.to0 = TRUE,
 nt.add = c(0,50,100, 250, 500, 1000, 2500, 5000), out.dir = getwd(),
 return.data = FALSE, nthread = 1)
 }

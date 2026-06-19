@@ -2,9 +2,9 @@ EaCoN.l2rplot.geno <- function(l2r = NULL, seg = NULL, seg.col = list(gain = "bl
                                seg.type = "block", seg.normal = TRUE, ylim = c(-1.5,1.5), genome.pkg = NULL, title = "L2RPLOT") {
 
   # message(tmsg(paste0("Loading ", genome.pkg, " ...")))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   # data(list = genome, package = "chromosomes", envir = environment())
@@ -55,9 +55,9 @@ EaCoN.l2rplot.geno <- function(l2r = NULL, seg = NULL, seg.col = list(gain = "bl
 EaCoN.bafplot.geno <- function(baf = NULL, seg = NULL, seg.col = list(Hetero = "black", Homo = "cadetblue4", Unbalanced = "coral1"),
                                seg.type = "line", ylim = c(-.01,1.01), genome.pkg = NULL, title = "BAFPLOT") {
 
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   # data(list = genome, package = "chromosomes", envir = environment())
@@ -92,9 +92,9 @@ EaCoN.bafplot.geno <- function(baf = NULL, seg = NULL, seg.col = list(Hetero = "
 EaCoN.l2rplot.karyo <- function(l2r = NULL, seg = NULL, seg.col = list(gain = "blue", outscale.gain = "midnightblue", loss = "red", outscale.red = "darkred"),
                                 seg.type = "block", seg.normal = TRUE, ylim = c(-1.5,1.5), genome.pkg = NULL) {
 
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   # cs <- chromobjector(BSg.obj)
   
   self.pkg.name <- "EaCoN"
@@ -151,9 +151,9 @@ EaCoN.l2rplot.chromo <- function(chr = NULL, l2r = NULL, l2r.seg = NULL, baf = N
 
   if (is.null(chr)) return()
   
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  genome <- metadata(BSg.obj)$genome
+  genome <- S4Vectors::metadata(BSg.obj)$genome
   # cs <- chromobjector(BSg.obj)
   
   self.pkg.name <- "EaCoN"

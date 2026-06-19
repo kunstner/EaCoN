@@ -24,9 +24,6 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
   # write.data = TRUE
   # plot = TRUE
   # return.data = FALSE
-  # require(foreach)
-  # source("~/git_gustaveroussy/EaCoN/R/mini_functions.R")
-  # source("~/git_gustaveroussy/EaCoN/R/renorm_functions.R")
 
   
   
@@ -75,11 +72,11 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
   ## Checking apt-copynumber-onco-ssa package loc
   apt.onco.pkg.name <- paste0("apt.oncoscan.", apt.version)
   if (!(apt.onco.pkg.name %in% installed.packages())) stop(tmsg(paste0("Package ", apt.onco.pkg.name, " not found !")), call. = FALSE)
-  suppressPackageStartupMessages(require(package = apt.onco.pkg.name, character.only = TRUE))
+  requireNamespace(apt.onco.pkg.name, quietly = TRUE)
   
   ## Processing CELs to an OSCHP file
   if (dir.exists(samplename) && force) unlink(samplename, recursive = TRUE, force = FALSE)
-  oscf <- apt.oncoscan.process(ATChannelCel = ATChannelCel, GCChannelCel = GCChannelCel, samplename = samplename, dual.norm = dual.norm, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
+  oscf <- get("apt.oncoscan.process", envir = asNamespace(apt.onco.pkg.name))(ATChannelCel = ATChannelCel, GCChannelCel = GCChannelCel, samplename = samplename, dual.norm = dual.norm, out.dir = out.dir, temp.files.keep = FALSE, force.OS = force.OS, apt.build = apt.build)
   
   ## Reading OSCHP
   my.oschp <- oschp.load(file = oscf)
@@ -91,10 +88,10 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
   
   ### Loading genome info
   tmsg(paste0("Loading ", genome.pkg, " ..."))
-  suppressPackageStartupMessages(require(genome.pkg, character.only = TRUE))
+  requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome2 <- metadata(BSg.obj)$genome
-  genome2 <- metadata(BSg.obj)$genome
+  # genome2 <- S4Vectors::metadata(BSg.obj)$genome
+  genome2 <- S4Vectors::metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
   ### Getting basic meta
@@ -122,7 +119,7 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
   )
   
   ## Extracting data : L2R
-  ao.df <- data.frame(ProbeSetName = my.oschp$ProbeSets$CopyNumber$ProbeSetName, chrs = as.vector(my.oschp$ProbeSets$CopyNumber$Chromosome), pos = as.vector(my.oschp$ProbeSets$CopyNumber$Position), L2R.ori = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]]), L2R = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]]), BAF = as.vector(my.oschp$ProbeSets$AllelicData$BAF), AD = as.vector(my.oschp$ProbeSets$AllelicData$AllelicDifference), CallF = as.vector(my.oschp$Genotyping$Calls$ForcedCall), ASignal = my.oschp$Genotyping$Calls$ASignal, BSignal = my.oschp$Genotyping$Calls$BSignal, stringsAsFactors = FALSE)
+  ao.df <- data.frame(ProbeSetName = my.oschp$ProbeSets$CopyNumber$ProbeSetName, chrs = as.vector(my.oschp$ProbeSets$CopyNumber$Chromosome), pos = as.vector(my.oschp$ProbeSets$CopyNumber$Position), L2R.ori = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]]), L2R = as.vector(my.oschp$ProbeSets$CopyNumber[[l2r.lev.conv[[l2r.level]]]]), BAF = as.vector(my.oschp$ProbeSets$AllelicData$BAF), AD = as.vector(my.oschp$ProbeSets$AllelicData$AllelicDifference), CallF = as.vector(my.oschp$Genotyping$Calls$ForcedCall), ASignal = my.oschp$Genotyping$Calls$ASignal, BSignal = my.oschp$Genotyping$Calls$BSignal)
   affy.chrom <- my.oschp$Chromosomes$Summary
   ak <- affy.chrom$Display
   names(ak) <- affy.chrom$Chromosome
@@ -238,7 +235,7 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
   
   ## Building ASCAT-like object
   tmsg("Building normalized object ...")
-  my.ch <- sapply(unique(ao.df$chrs), function(x) { which(ao.df$chrs == x) })
+  my.ch <- split(seq_along(ao.df$chrs), as.integer(ao.df$chrs))
   my.ascat.obj <- list(
     data = list(
       Tumor_LogR.ori = data.frame(sample = ao.df$L2R.ori, row.names = ao.df$ProbeSetName),
@@ -251,14 +248,14 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
       Germline_BAF = NULL,
       # SNPpos = data.frame(chrs = ao.df$chrA, pos = ao.df$pos, row.names = rownames(ao.df)),
       SNPpos = data.frame(chrs = ao.df$chr, pos = ao.df$pos, row.names = ao.df$ProbeSetName),
-      ch = sapply(unique(ao.df$chr), function(x) { which(ao.df$chr == x) }),
-      chr = sapply(unique(ao.df$chrgap), function(x) { which(ao.df$chrgap == x) }),
+      ch = split(seq_along(ao.df$chr), ao.df$chr)[unique(ao.df$chr)],
+      chr = split(seq_along(ao.df$chrgap), as.integer(ao.df$chrgap))[unique(as.integer(ao.df$chrgap))],
       chrs = unique(ao.df$chr),
       samples = samplename,
       gender = as.vector(meta.b$predicted.gender),
       sexchromosomes = sex.chr,
       failedarrays = NULL,
-      additional = data.frame(RD.test = ao.df$ASignal, RD.ref = ao.df$BSignal, LOR = ao.df$AD, LORvar = ao.df$LORvar, stringsAsFactors = FALSE)
+      additional = data.frame(RD.test = ao.df$ASignal, RD.ref = ao.df$BSignal, LOR = ao.df$AD, LORvar = ao.df$LORvar)
     ),
     meta = list(
       basic = meta.b,
