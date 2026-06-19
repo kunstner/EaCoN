@@ -43,11 +43,25 @@ It consists in a series of R packages that perform such type of analysis, from r
 
 ## **NOTES**
 
-* Support for R v4.0.x has been added thanks to suggestions by [ShenWei-wei](https://github.com/ShenWei-wei), but has not been extensively tested yet (few successful tests using CytoScanHD CEL files only).
-* Support for R v3.x should remain, now.
-* Links for dependencies hosted on our institutional NextCloud instance have a forced deadline. Current one should be 2021-11-03, so if a link fail for you, it means I probably forgot to renew these links : please warn me by mail and I'll fix this :)
+* **v0.4.0 requires R >= 4.2.0.** Support for R < 4.2.0 has been dropped as part of the modernisation effort.
+* **WES data support has not been tested in v0.4.0.** The modernisation effort focused on Affymetrix microarray workflows (OncoScan, CytoScan, SNP6). WES functionality remains in the codebase but should be considered untested until further validation.
+* Support for R v4.0.x was added in v0.3.6 thanks to [ShenWei-wei](https://github.com/ShenWei-wei); this fork supersedes that with a full R 4.2+ modernisation.
+* Links for dependencies hosted on the Gustave Roussy NextCloud instance may be expired. If a link fails, please open an issue on the [GitHub repository](https://github.com/kunstner/EaCoN/issues).
 
 ## **QUICK NEWS**
+
+### **2026-06-18 : v0.4.0 _(The Resurrection)_ is out !**
+* MOD : Full modernisation for R >= 4.2.0 — package now installs and runs cleanly on current R/Bioconductor.
+* MOD : Replaced `iotools`, `data.table` and `R.utils` dependencies with `readr` and base R connections.
+* MOD : All `require()`/`suppressPackageStartupMessages()` calls replaced with `requireNamespace()`.
+* MOD : Removed all `stringsAsFactors` arguments (obsolete since R 4.0).
+* MOD : Replaced `sapply(unique(x), which)` index-splitting with `split()[unique()]`, preserving genomic chromosome ordering critical for ASCAT segmentation.
+* MOD : `purrr::map_*` replacing typed `sapply` calls throughout.
+* CORR : Fixed `metadata()` attribution to `S4Vectors` (not `BiocGenerics`).
+* CORR : Fixed `apt.*process()` calls to use `get(..., envir = asNamespace())` pattern.
+* CORR : Fixed cytoband lookup crash for segments at chromosome boundaries (centromeres/telomeres).
+* CORR : Hardened `GCnorm.pcs()` and `l2r.fitloop()` against `raw`-type HDF5 columns.
+* Maintainer change: Axel Künstner (Universität zu Lübeck). Original author: Bastien Job (Gustave Roussy).
 
 ### **2021-10-18 : v0.3.6-2 _(CloudyMonday2)_ is out !**
 * CORR : Added some fixes to recent R updates that broke SNP6.Process (thanks to 卜小云 <boxy@sysucc.org.cn> that found the bug) :
@@ -620,5 +634,6 @@ WES | `2` to `10` | `5` | `0.5` *(default)* to `1` | `0.75` *(default)*
 
 ## **AUTHORS & CONTACT**
 
- - Bastien Job (bastien.job@inserm.fr, bastien.job@gustaveroussy.fr) : developer and maintainer
+ - Axel Künstner (axel.kuenstner@uni-luebeck.de) : maintainer (v0.4.0+)
+ - Bastien Job (bastien.job@inserm.fr, bastien.job@gustaveroussy.fr) : original developer (v0.1.0–v0.3.6-2)
  - Thibault Dayris (thibault.dayris@gustaveroussy.fr) : tester, user
