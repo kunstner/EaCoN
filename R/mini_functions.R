@@ -72,18 +72,17 @@ oschp.load <- function(file = NULL) {
   h5.data <- rhdf5::h5read(file = file, name = "/")
   h5.mlist <- h5.data$Dset_IO_HDF5_Gdh
   if(length(h5.mlist) > 1) {
-    `%do%` <- foreach::"%do%"
-    h5.meta <- foreach::foreach (a = 1:(length(h5.mlist)-1)) %do% {
-      h5.meta.c <- foreach (l = 1:(list.depth(h5.mlist[[a]])-1)) %do% {
+    h5.meta <- purrr::map(1:(length(h5.mlist)-1), function(a) {
+      h5.meta.c <- purrr::map(1:(list.depth(h5.mlist[[a]])-1), function(l) {
         tmp.list <- h5.mlist[[a]][["_&keyvals"]]
-        h5.mlist[[a]] <- h5.mlist[[a]][[1]]
-        return(meta.df2list(tmp.list))
-      }
-      names(h5.meta.c) <- foreach (l = h5.meta.c, .combine = "c") %do% {
-        return(rev(unlist(strsplit(x = l[["data_source"]], split = "-")))[1])
-      }
-      return(h5.meta.c)
-    }
+        h5.mlist[[a]] <<- h5.mlist[[a]][[1]]
+        meta.df2list(tmp.list)
+      })
+      names(h5.meta.c) <- purrr::map_chr(h5.meta.c, function(l) {
+        rev(unlist(strsplit(x = l[["data_source"]], split = "-")))[1]
+      })
+      h5.meta.c
+    })
     names(h5.meta) <- paste0("CEL", 1:(length(h5.mlist)-1))
   } else h5.meta <- list()
   h5.meta$analysis = meta.df2list(h5.mlist[["_&keyvals"]])
@@ -155,8 +154,7 @@ chromobjector <- function(BSg = NULL) {
 
 ## Handles GZ, BZ2 or ZIP -compressed CEL files
 compressed_handler <- function(CELz = NULL) {
-  `%do%` <- foreach::"%do%"
-  CELz2 <- foreach::foreach(CEL = CELz, .combine = "c") %do% {
+  CELz2 <- purrr::map_chr(CELz, function(CEL) {
     tmsg(paste0("Decompressing ", CEL, " ..."))
     if (tolower(tools::file_ext(CEL)) == "bz2") {
       uncomp_file <- tempfile(fileext = ".CEL")
@@ -179,9 +177,9 @@ compressed_handler <- function(CELz = NULL) {
       utils::unzip(zipfile = CEL, files = zname, exdir = tempdir(), overwrite = TRUE)
       CEL <- file.path(tempdir(), zname)
     } else if (tolower(tools::file_ext(CEL)) != "cel") stop(tmsg(paste0("File ", CEL, " is not recognized as raw nor compressed (gz, bz2, zip) CEL file !")), call. = FALSE)
-    return(CEL)
-  }
-  return(CELz2)
+    CEL
+  })
+  CELz2
 }
 
 ## Convert BAF to mBAF

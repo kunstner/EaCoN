@@ -24,13 +24,9 @@ BedGC.fasta <- function(binned.bed.file = NULL, genome = "hg19", fasta = NULL, n
   klen <- Biostrings::fasta.seqlengths(filepath = fasta)
   kdata <- Biostrings::readDNAStringSet(filepath = fasta, format = "fasta")
 
-  message("Starting cluster ...")
-  cl <- parallel::makeCluster(spec = nthread, type = "PSOCK")
-  doParallel::registerDoParallel(cl)
-
-  `%dopar%` <- foreach::"%dopar%"
-  a <- 0
-  Agcpc <- foreach::foreach(a = nt.add, .combine = "cbind") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  Agcpc <- do.call(cbind, furrr::future_map(nt.add, function(a) {
     message(paste0("Computing GC for frame +", a, " bp"))
 
     querystart <- bed.data$start - a
@@ -41,19 +37,15 @@ BedGC.fasta <- function(binned.bed.file = NULL, genome = "hg19", fasta = NULL, n
 
     kbs.idx <- vapply(bed.data$chr, function(k) { which(kdata@ranges@NAMES == k) }, 1L)
 
-    gcpc <- vapply(1:nrow(bed.data), function(x) {
+    gcpc <- vapply(seq_len(nrow(bed.data)), function(x) {
       aFreq <- Biostrings::alphabetFrequency(Biostrings::subseq(kdata[kbs.idx[x]], querystart[x], queryend[x]), baseOnly = TRUE)
       acgt.count <- sum(aFreq[colnames(aFreq) != "other"])
       gc.count <- sum(aFreq[colnames(aFreq) %in% c("G", "C")])
-      gcpc.x <- gc.count / acgt.count
-      return(gcpc.x)
+      gc.count / acgt.count
     }, .1)
     if (na.to0) gcpc[is.na(gcpc)] <- 0
-    return(gcpc)
-  }
-
-  message("Stopping cluster ...")
-  parallel::stopCluster(cl)
+    gcpc
+  }, .options = furrr::furrr_options(seed = TRUE)))
 
   ## Building the output object
   colnames(Agcpc) <- paste0("GC", nt.add, "b")
@@ -87,19 +79,13 @@ BedGC.fasta.chr <- function(binned.bed.file = NULL, genome = "hg19", fasta.dir =
 
   kcoords <- split(bed.data, bed.data$chr)
 
-  message("Starting cluster ...")
-  cl <- parallel::makeCluster(spec = nthread, type = "PSOCK")
-  doParallel::registerDoParallel(cl)
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
 
-  a <- 0
-  `%do%` <- foreach::"%do%"
-  `%dopar%` <- foreach::"%dopar%"
-
-  Agcpc <- foreach(a=nt.add, .combine = "cbind") %do% {
+  Agcpc <- do.call(cbind, purrr::map(nt.add, function(a) {
     message(paste0("Computing GC for frame +", a, " bp"))
 
-    k <- 0
-    gcpc <- foreach(k=kcoords, .combine = "c", .noexport = c("kcoords", "bed.data")) %dopar% {
+    gcpc <- unlist(furrr::future_map(kcoords, function(k) {
       kchr <- unique(k$chr)
       kfafile <- paste0(fasta.dir, "/", kchr, ".fa")
       if (!file.exists(kfafile)) stop(paste0("Could ont find : ", kfafile), call. = FALSE)
@@ -112,20 +98,17 @@ BedGC.fasta.chr <- function(binned.bed.file = NULL, genome = "hg19", fasta.dir =
       querystart[querystart < 1] <- 1
       queryend[queryend > klen] <- klen
 
-      gcpc.k <- vapply(1:nrow(k), function(x) {
+      gcpc.k <- vapply(seq_len(nrow(k)), function(x) {
         aFreq <- Biostrings::alphabetFrequency(Biostrings::subseq(kdata, querystart[x], queryend[x]), baseOnly = TRUE)
         acgt.count <- sum(aFreq[colnames(aFreq) != "other"])
         gc.count <- sum(aFreq[colnames(aFreq) %in% c("G", "C")])
-        gcpc.x <- gc.count / acgt.count
-        return(gcpc.x)
+        gc.count / acgt.count
       }, .1)
-      return(gcpc.k)
-    }
+      gcpc.k
+    }, .options = furrr::furrr_options(seed = TRUE)))
     if (na.to0) gcpc[is.na(gcpc)] <- 0
-    return(gcpc)
-  }
-  message("Stopping cluster ...")
-  parallel::stopCluster(cl)
+    gcpc
+  }))
   ## Building the output object
   # colnames(Agcpc) <- paste0("GC", nt.add, "b")
   colnames(Agcpc) <- paste0("GC", nt.add, "b")
@@ -169,16 +152,12 @@ BedGC.R <- function(binned.bed.file = NULL, human.genome.build = "hg19", na.to0 
 
   klen <- GenomeInfoDb::seqlengths(Hsapiens)
 
-  message("Starting cluster ...")
-  cl <- parallel::makeCluster(spec = nthread, type = "PSOCK")
-  doParallel::registerDoParallel(cl)
-
-  `%dopar%` <- foreach::"%dopar%"
-  a <- 0
-  Agcpc <- foreach::foreach(a = nt.add, .combine = "cbind") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  Agcpc <- do.call(cbind, furrr::future_map(nt.add, function(a) {
     message(paste0("Computing GC for frame +", a, " bp"))
 
-    Kgcpc <- foreach::foreach(k = unique(bed.data$chr), .combine = "rbind") %dopar% {
+    Kgcpc <- dplyr::bind_rows(purrr::map(unique(bed.data$chr), function(k) {
       kbed <- bed.data[bed.data$chr == k,]
       kbed$start <- kbed$start - a
       kbed$end <- kbed$end + a
@@ -188,21 +167,17 @@ BedGC.R <- function(binned.bed.file = NULL, human.genome.build = "hg19", na.to0 
 
       kseq <- Hsapiens[[k]]
 
-      gcpc <- vapply(1:nrow(kbed), function(x) {
+      gcpc <- vapply(seq_len(nrow(kbed)), function(x) {
         aFreq <- Biostrings::alphabetFrequency(Biostrings::subseq(kseq, kbed$start[x], kbed$end[x]), baseOnly = TRUE)
         acgt.count <- sum(aFreq[names(aFreq) != "other"])
         gc.count <- sum(aFreq[names(aFreq) %in% c("G", "C")])
-        gcpc.x <- gc.count / acgt.count
-        return(gcpc.x)
+        gc.count / acgt.count
       }, .1)
       if (na.to0) gcpc[is.na(gcpc)] <- 0
-      return(gcpc)
-    }
-    return(Kgcpc)
-  }
-
-  message("Stopping cluster ...")
-  parallel::stopCluster(cl)
+      gcpc
+    }))
+    Kgcpc
+  }, .options = furrr::furrr_options(seed = TRUE)))
 
   ## Building the output object
   colnames(Agcpc) <- paste0("GC", nt.add, "b")

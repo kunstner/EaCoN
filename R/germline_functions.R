@@ -16,7 +16,7 @@
 #   if (toclustname == "BAF") bafcdf$value <- tbsm else if (toclustname == "mBAF") bafcdf$value <- bsm else stop(tmsg("Unknown toclustname value !"))
 #   bafcdf.nna <- bafcdf[!is.na(bafcdf$value),]
 #   
-#   `%do%` <- foreach::"%do%"
+#
 #   scaledBAF <- foreach::foreach(k = unique(ASCATobj$SNPpos$chrs), .combine = "c") %do% {
 #     WESk <- bafcdf.nna[bafcdf.nna$chrs == k,]
 #     if(nrow(WESk) == 0) return(NULL)
@@ -68,34 +68,32 @@ BAF.Rescale <- function(data = NULL, bafbin.size = 1E+07, toclustname = "BAF", o
   bsm <- ifelse(bsm < .5, bsm, 1 - bsm)
   if (toclustname == "BAF") bafcdf$value <- tbsm else if (toclustname == "mBAF") bafcdf$value <- bsm else stop(tmsg("Unknown toclustname value !"), call. = FALSE)
   bafcdf.nna <- bafcdf[!is.na(bafcdf$value),]
-  
-  `%do%` <- foreach::"%do%"
-  scaledBAF <- foreach::foreach(k = unique(data$data$SNPpos$chrs), .combine = "c") %do% {
+  scaledBAF <- unlist(purrr::map(unique(data$data$SNPpos$chrs), function(k) {
     WESk <- bafcdf.nna[bafcdf.nna$chrs == k,]
     if(nrow(WESk) == 0) return(NULL)
     krange <- range(WESk$pos, na.rm = TRUE)
     binmax <- ceiling(diff(krange) / bafbin.size)
-    
+
     ## Scaling
-    scaledBAF.k <- foreach::foreach(bk = seq_len(binmax), .combine = "c") %do% {
+    scaledBAF.k <- unlist(purrr::map(seq_len(binmax), function(bk) {
       bleft <- krange[1] + (bafbin.size * (bk - 1))
       bright <- krange[1] + (bafbin.size * bk)
       inbk.full <- WESk$pos >= bleft & WESk$pos < bright
-      
-      if(!any(inbk.full)) return()
+
+      if(!any(inbk.full)) return(NULL)
       BAFk.full <- WESk$value[inbk.full]
-      
+
       if (length(BAFk.full) >= 100) {
         bafden <- density(BAFk.full, adjust = .5)
         lowedge <- bafden$x[bafden$x < .25][which(bafden$y[bafden$x < .25] == max(bafden$y[bafden$x < .25]))]
         highedge <- bafden$x[bafden$x > .75][which(bafden$y[bafden$x > .75] == max(bafden$y[bafden$x > .75]))]
         BAFk.full <- (BAFk.full / (highedge-lowedge)) - (lowedge/highedge)
       }
-      return(BAFk.full)
-    }
+      BAFk.full
+    }))
     bafcdf.nna$value[bafcdf.nna$chrs == k] <- scaledBAF.k
-    return(bafcdf.nna$value[bafcdf.nna$chrs == k])
-  }
+    bafcdf.nna$value[bafcdf.nna$chrs == k]
+  }))
   data$data$Tumor_BAF_Unscaled <- data$data$Tumor_BAF
   data$data$Tumor_BAF[,1][!is.na(data$data$Tumor_BAF[,1])] <- scaledBAF
   data$meta$eacon$BAF.rescale <- "TRUE"
@@ -133,19 +131,6 @@ Segment.ASCAT.ff <- function(RDS.file = NULL, ...) {
 
 EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelName = "E", toclustname = "BAF", mc.G = 2:4, nfactor = 4, BAF.filter = .9, BAF.cutter = 0, segmentLength = 5, genome.pkg = "BSgenome.Hsapiens.UCSC.hg19") {
 
-  # ## TEMP
-  # setwd("/home/job/WORKSPACE/MP/CYTO/18R00201/")
-  # ASCATobj = readRDS("/home/job/WORKSPACE/MP/CYTO/18R00201/20180220134039/18R00201.EaCoN.ASPCF.RDS")$data
-  # bafbin.size = 1E+07
-  # modelName = "E"
-  # toclustname = "BAF"
-  # mc.G = 2:4
-  # nfactor = 4
-  # segmentLength = 5
-  # genome.pkg = "BSgenome.Hsapiens.UCSC.hg19"
-  # BAF.filter <- .90
-  # BAF.cutter <- 0
-
   ## Loading genome data
   if (!genome.pkg %in% BSgenome::installed.genomes()) {
     if (genome.pkg %in% BSgenome::available.genomes()) {
@@ -154,11 +139,9 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
       stop(tmsg(paste0("BSgenome ", genome.pkg, " not available in valid BSgenomes and not installed ... Please check your genome name or install your custom BSgenome !")), call. = FALSE)
     }
   }
-  # data(list = genome, package = "chromosomes", envir = environment())
   message(tmsg(paste0("Loading ", genome.pkg, " ...")))
   requireNamespace(genome.pkg, quietly = TRUE)
   BSg.obj <- getExportedValue(genome.pkg, genome.pkg)
-  # genome <- metadata(BSg.obj)$genome
   genome <- metadata(BSg.obj)$genome
   cs <- chromobjector(BSg.obj)
   
@@ -188,24 +171,17 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
 
   ## Computing banded BAF clusters
   message(tmsg("BAF clustering ..."))
-  `%do%` <- foreach::"%do%"
-  mcreslist <- foreach::foreach(k = unique(ASCATobj$SNPpos$chrs), .combine = "c") %do% {
+  mcreslist <- unlist(purrr::map(unique(ASCATobj$SNPpos$chrs), function(k) {
     WESk <- bafcdf.nna[bafcdf.nna$chrs == k,]
     if(nrow(WESk) == 0) return(NULL)
     krange <- range(WESk$pos, na.rm = TRUE)
     binmax <- ceiling(diff(krange) / bafbin.size)
 
-    ## Legacy code when prior was chr-based
-    # if (!is.null(prior)) {
-    #   if (prior == "K") {
-        set.seed(123456)
-    #     
-        priorX <- mclust::defaultPrior(WESk$value, G = mc.G, modelName = modelName)
-    #   }
-    # }
+    set.seed(123456)
+    priorX <- mclust::defaultPrior(WESk$value, G = mc.G, modelName = modelName)
 
     ## Clustering
-    mcresk <- foreach::foreach(bk = seq_len(binmax)) %do% {
+    mcresk <- purrr::map(seq_len(binmax), function(bk) {
 
       bleft <- krange[1] + (bafbin.size * (bk - 1))
       bright <- krange[1] + (bafbin.size * bk)
@@ -229,8 +205,6 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
       Xin <- BAFk.full >= BAF.cutter & BAFk.full <= (1 - BAF.cutter)
       retvec <- rep(NA, length(BAFk.full))
       if(!any(Xin)) {
-        # retvec[Xlo] <- min(mc.G)
-        # retvec[Xhi] <- max(mc.G)
         retvec[!Xin] <- min(mc.G)
         return(retvec)
       }
@@ -241,13 +215,7 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
 
       if (length(unique(BAFk)) == 1) return(retvec)
       set.seed(123456)
-      # if (is.null(prior)) {
-        # mcBAFk <- try(suppressWarnings(mclust::Mclust(BAFk, G = mcMin:mcMax, modelNames = modelName, verbose = FALSE)))
-        # mcBAFk <- try(suppressWarnings(mclust::Mclust(BAFk, G = mc.G, modelNames = modelName, verbose = FALSE)))
-      # } else  {
-        # mcBAFk <- try(suppressWarnings(mclust::Mclust(BAFk, G = mcMin:mcMax, modelNames = modelName, verbose = FALSE, prior = priorControl(scale = priorX$scale))))
-        mcBAFk <- try(suppressWarnings(mclust::Mclust(BAFk, G = mc.G, modelNames = modelName, verbose = FALSE, prior = priorControl(scale = priorX$scale))), silent = TRUE)
-      # }
+      mcBAFk <- try(suppressWarnings(mclust::Mclust(BAFk, G = mc.G, modelNames = modelName, verbose = FALSE, prior = priorControl(scale = priorX$scale))), silent = TRUE)
       ## Handling case of failed mclust
       if (is.null(mcBAFk)) return(retvec)
       if (is.character(mcBAFk)) return(retvec)
@@ -266,46 +234,30 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
       retvec[Xlo] <- min(kclassif)
       retvec[Xhi] <- max(kclassif)
       retvec[Xin] <- kclassif
-      # return(kclassif)
-      return(retvec)
-    }
-    return(mcresk)
-  }
+      retvec
+    })
+    mcresk
+  }), recursive = FALSE)
 
   unl.mcres <- unlist(mcreslist)
-  # summary(unl.mcres)
-  # table(unl.mcres)
 
-  # message("MCLOGIC")
-  mclogic <- foreach::foreach(b = mcreslist) %do%  {
-    # if(!is.numeric(b)) message(b)
-    if (length(b) == 0) return()
-    ## Handling case of single class (NA by default)
-    # if (length(unique(b[!is.na(b)])) == 1) return(rep(NA, length(b)))
-
+  mclogic <- purrr::map(mcreslist, function(b) {
+    if (length(b) == 0) return(NULL)
     if(all(is.na(b))) return(rep(NA, length(b)))
     klogical <- rep(FALSE, length(b))
     klogical[b == max(b, na.rm = TRUE)] <- TRUE
     klogical[b == min(b, na.rm = TRUE)] <- TRUE
-    # klogical[is.na(b)] <- NA
-    # if (max(b, na.rm = TRUE) == 2) klogical[b == 2] <- NA
-    return(klogical)
-  }
+    klogical
+  })
   unl.logic <- unlist(mclogic)
-
-  # unl.logic <- rep(TRUE, nrow(bafcdf.nna.complete))
-  # unl.logic[baf.Xin] <- unl.logic.tmp
 
   ## Rate of hetero features
   hrate <- length(which(!unl.logic)) / length(unl.logic[!is.na(unl.logic)])
-  # message(hrate)
 
   ## Filtering noisy features
   if (!is.null(BAF.filter)) {
     message(tmsg(paste0("Filtering BAF noise at ", BAF.filter * 100, "%...")))
-    # allProbes = 1:length(Tumor_BAF_noNA)
     allProbes <- seq_along(unl.logic)
-    # nonHomoProbes = allProbes[is.na(Hom) | Hom == FALSE]
     Hom <- unl.logic
     Hom[!Hom] <- NA
     names(Hom) <- names(Tumor_BAF_noNA)
@@ -315,7 +267,6 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
     bsmHNA <- bsm[!is.na(bsm)]
     bsmHNA[!is.na(Hom) & Hom] = NA
     for (k in seq_along(ASCATobj$ch)) {
-      # print(k)
       chrke <- ASCATobj$ch[[k]]
       chrNonHomoProbes = intersect(nonHomoProbes, chrke)
       if (length(chrNonHomoProbes) > 5) {
@@ -366,16 +317,13 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
 
   ## Rescuing homo regions
   message(tmsg("Rescuing putative homozygous BAF regions ..."))
-  mcrescued <- foreach::foreach(b = mclogic) %do% {
-    blen <- length(b)
-    if(blen > 0) {
-      if(all(!is.na(b))) {
-        bhrate <- length(which(!b)) / length(b[!is.na(b)])
-        if (bhrate < hrate / nfactor) b <- rep(FALSE, length(b))
-      }
+  mcrescued <- purrr::map(mclogic, function(b) {
+    if (length(b) > 0 && all(!is.na(b))) {
+      bhrate <- length(which(!b)) / length(b[!is.na(b)])
+      if (bhrate < hrate / nfactor) b <- rep(FALSE, length(b))
     }
-    return(b)
-  }
+    b
+  })
   unl.rescued <- unlist(mcrescued)
 
   ## Applying 95% BAF noise filtering
@@ -390,35 +338,21 @@ EaCoN.Predict.Germline <- function(ASCATobj = NULL, bafbin.size = 1E+07, modelNa
   mclogic.col <- as.numeric(mclogic.col)
   mclogic.col[is.na(mclogic.col)] <- 2
   mclogic.col <- c("red", "blue", "grey50")[(mclogic.col+1)]
-  # message('chk4')
   mcres.col <- unl.rescued
   mcres.col <- as.numeric(mcres.col)
   mcres.col[is.na(mcres.col)] <- 2
   mcres.col <- c("red", "blue", "grey50")[(mcres.col+1)]
-  # message('chk6')
-  # data(list = genome, package = "chromosomes", envir = environment())
-  # if(length(grep(pattern = "chr", x = names(cs$chrom2chr), ignore.case = TRUE)) > 0) {
-  #   bafcdf.nna$genopos <- bafcdf.nna$pos + cs$chromosomes$chr.length.toadd[unlist(cs$chrom2chr[paste0("chr", bafcdf.nna$chrs)])]
-  # } else bafcdf.nna$genopos <- bafcdf.nna$pos + cs$chromosomes$chr.length.toadd[unlist(cs$chrom2chr[as.character(bafcdf.nna$chrs)])]
   bafcdf.nna$genopos <- bafcdf.nna$pos + cs$chromosomes$chr.length.toadd[unlist(cs$chrom2chr[as.character(bafcdf.nna$chrs)])]
-  # message(str(bafcdf.nna$genopos))
-  # message('chk6')
   message(tmsg("Plotting BAF ..."))
   png(paste0(ASCATobj$samples[1], ".PredictedGermline.png"), width = 1700, height = 950)
   par(mfrow = c(3,1))
-  # message('chk7')
   plot(bafcdf.nna$genopos, bafcdf.nna$value, col = mcreslist.col, pch = ".", yaxs = "i", xaxs = "i", ylim = c(0,1), cex = 5, xlab = "Genomic position", ylab = "BAF", main = paste0("Clustered BAF (", nrow(bafcdf.nna), ")"))
   abline(v = cs$chromosomes$chr.length.sum, col = 1, lwd = 2)
-  # message('chk8')
   plot(bafcdf.nna$genopos, bafcdf.nna$value, col = mclogic.col, pch = ".", yaxs = "i", xaxs = "i", ylim = c(0,1), cex = 5, xlab = "Genomic position", ylab = "BAF", main = paste0("Logical BAF (", length(which(unl.logic)), ")"))
   abline(v = cs$chromosomes$chr.length.sum, col = 1, lwd = 2)
-  # message('chk9')
   plot(bafcdf.nna$genopos, bafcdf.nna$value, col = mcres.col, pch = ".", yaxs = "i", xaxs = "i", ylim = c(0,1), cex = 5, xlab = "Genomic position", ylab = "BAF", main = paste0("Filtered, rescued BAF (", length(which(unl.rescued)), ")"))
   abline(v = cs$chromosomes$chr.length.sum, col = 1, lwd = 2)
-  # message('chk10')
   dev.off()
 
-  # message("DONE!")
   return(hoObj)
 }
-

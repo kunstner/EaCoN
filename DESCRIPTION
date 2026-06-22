@@ -2,8 +2,8 @@ Encoding: UTF-8
 Package: EaCoN
 Type: Package
 Title: EaCoN : Easy Copy Number !
-Version: 0.4.0
-Date: 2026-06-18
+Version: 0.5.0
+Date: 2026-06-19
 Author: Bastien Job [aut], Axel Künstner [ctb]
 Authors@R: c(
   person("Bastien", "Job", email = "bastien.job@inserm.fr", role = "aut"),
@@ -17,11 +17,11 @@ Imports:
   BiocGenerics,
   BSgenome,
   changepoint,
-  doParallel,
   dplyr,
   DT,
   facets,
-  foreach,
+  future,
+  furrr,
   GenomeInfoDb,
   GenomicRanges,
   IRanges,

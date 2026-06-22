@@ -348,7 +348,7 @@ CS.Process <- function(CEL = NULL, samplename = NULL, dual.norm = FALSE, normal.
   if(return.data) return(my.ascat.obj) else rm(my.ascat.obj)
 }
 
-CS.Process.Batch <- function(CEL.list.file = NULL, nthread = 1, cluster.type = "PSOCK", ...) {
+CS.Process.Batch <- function(CEL.list.file = NULL, nthread = 1, ...) {
   ## Checking the CEL.list.file
   if (is.null(CEL.list.file)) stop("A CEL.list.file is required !", call. = FALSE)
   if (!file.exists(CEL.list.file)) stop("Could not find CEL.list.file !", call. = FALSE)
@@ -385,20 +385,12 @@ CS.Process.Batch <- function(CEL.list.file = NULL, nthread = 1, cluster.type = "
 
   ## Building cluster
   current.bitmapType <- getOption("bitmapType")
-  `%dopar%` <- foreach::"%dopar%"
-  `%do%` <- foreach::"%do%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-
-  p <- 0
-  csres <- foreach::foreach(p = seq_len(nrow(myCELs)), .inorder = FALSE, .errorhandling = "pass") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(seq_len(nrow(myCELs)), function(p) {
     EaCoN.set.bitmapType(type = current.bitmapType)
     CS.Process(CEL = myCELs$CEL[p], samplename = myCELs$SampleName[p], ...)
-  }
-
-  ## Stopping cluster
-  message("Stopping cluster ...")
-  parallel::stopCluster(cl)
+  }, .options = furrr::furrr_options(seed = TRUE))
 
   message("Done.")
   # if (return.data) return(csres)

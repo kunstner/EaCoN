@@ -17,8 +17,6 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
   # write.data = TRUE
   # plot = TRUE
 
-  `%do%` <- foreach::"%do%"
-
   calling.method <- tolower(calling.method)
 
   if (!is.list(data)) stop(tmsg("data should be a list !"), call. = FALSE)
@@ -130,11 +128,10 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
 
   ## Computing gaps
   if (!is.null(mingap)) {
-    # `%do%` <- foreach::"%do%"
-    data$data$chr <- foreach::foreach(k = data$data$ch, .combine = "c") %do% {
+    data$data$chr <- unlist(lapply(data$data$ch, function(k) {
       gapz <- which(diff(data$data$SNPpos$pos[k]) >= mingap)
-      return(unname(split(k, findInterval(k, k[gapz+1]))))
-    }
+      unname(split(k, findInterval(k, k[gapz+1])))
+    }), recursive = FALSE)
   }
 
   ## Limiting BAF range
@@ -242,11 +239,10 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
       tmsg(paste0(" Found ", length(rescued), "."))
       if (length(rescued) > seg.maxn) tmsg("WARNING : Many small events found, profile may be noisy ! Consider using 'smooth.k', or for WES data, strengthen low depth filtering !")
       data$meta$eacon[["PELT-nseg"]] <- length(rescued)
-      # `%do%` <- foreach::"%do%"
-      foreach::foreach(re = rescued, .combine = "c") %do% {
+      #
+      for (re in rescued) {
         interv <- mydf$idx.ori[seg.start[re]]:mydf$idx.ori[seg.end[re]]
         data$data$Tumor_LogR_segmented[interv] <- median(data$data$Tumor_LogR[interv, 1], na.rm = TRUE)
-        return()
       }
     }
   }
@@ -290,18 +286,17 @@ Segment.ASCAT <- function(data = NULL, mingap = 5E+06, smooth.k = NULL, BAF.filt
 
   ## L2R calling
   tmsg("Calling L2R ...")
-  l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
+  l2r.segments <- dplyr::bind_rows(purrr::map(seq_along(data$data$ch), function(k) {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
     segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
-    probecs <- cumsum(segdf$Probes)
     segdf$End.idx <- as.integer(cumsum(segdf$Probes) + data$data$ch[[k]][1] - 1)
-    segdf$Start.idx <-as.integer(c(data$data$ch[[k]][1], segdf$End.idx[-nrow(segdf)] + 1))
+    segdf$Start.idx <- as.integer(c(data$data$ch[[k]][1], segdf$End.idx[-nrow(segdf)] + 1))
     segdf$Start <- as.integer(data$data$SNPpos$pos[segdf$Start.idx])
     segdf$End <- as.integer(data$data$SNPpos$pos[segdf$End.idx])
-    segdf <- segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
-  }
+    segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
+  }))
 
   my.mad <- get.mad(data$data$Tumor_LogR[,1])
 
@@ -667,11 +662,9 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
       tmsg(paste0(" Found ", length(rescued), "."))
       if (length(rescued) > seg.maxn) tmsg("WARNING : Many small events found, profile may be noisy ! Consider using 'smooth.k', or for WES data, strengthen low depth filtering !")
       data$meta$eacon[["PELT-nseg"]] <- length(rescued)
-      `%do%` <- foreach::"%do%"
-      foreach::foreach(re = rescued, .combine = "c") %do% {
+      for (re in rescued) {
         interv <- mydf$idx.ori[seg.start[re]]:mydf$idx.ori[seg.end[re]]
         data$data$Tumor_LogR_segmented[interv] <- median(data$data$Tumor_LogR[interv, 1], na.rm = TRUE)
-        return()
       }
     }
   }
@@ -715,19 +708,17 @@ Segment.FACETS <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, homoC
 
   ## L2R calling
   tmsg("Calling L2R ...")
-  l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
+  l2r.segments <- dplyr::bind_rows(purrr::map(seq_along(data$data$ch), function(k) {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
     segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
-    # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
-    probecs <- cumsum(segdf$Probes)
     segdf$End.idx <- cumsum(segdf$Probes) + data$data$ch[[k]][1] - 1
     segdf$Start.idx <- c(data$data$ch[[k]][1], segdf$End.idx[-nrow(segdf)] + 1)
     segdf$Start <- data$data$SNPpos$pos[segdf$Start.idx]
     segdf$End <- data$data$SNPpos$pos[segdf$End.idx]
-    segdf <- segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
-  }
+    segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
+  }))
 
   my.mad <- get.mad(data$data$Tumor_LogR[,1])
 
@@ -842,8 +833,6 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
   # force = FALSE
 
   calling.method <- tolower(calling.method)
-
-  `%do%` <- foreach::"%do%"
 
   if (!is.list(data)) stop(tmsg("data should be a list !"), call. = FALSE)
   if (!dir.exists(out.dir)) stop(tmsg(paste0("Output directory [", out.dir, "] does not exist !")), call. = FALSE)
@@ -1104,10 +1093,9 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
       tmsg(paste0(" Found ", length(rescued), "."))
       if (length(rescued) > seg.maxn) tmsg("WARNING : Many small events found, profile may be noisy ! Consider using 'smooth.k', or for WES data, strengthen low depth filtering !")
       data$meta$eacon[["PELT-nseg"]] <- length(rescued)
-      foreach::foreach(re = rescued, .combine = "c") %do% {
+      for (re in rescued) {
         interv <- mydf$idx.ori[seg.start[re]]:mydf$idx.ori[seg.end[re]]
         data$data$Tumor_LogR_segmented[interv] <- median(data$data$Tumor_LogR[interv, 1], na.rm = TRUE)
-        return()
       }
     }
   }
@@ -1151,19 +1139,17 @@ Segment.SEQUENZA <- function(data = NULL, smooth.k = NULL, BAF.filter = .75, hom
 
   ## L2R calling
   tmsg("Calling L2R ...")
-  l2r.segments <- foreach::foreach(k = 1:length(data$data$ch), .combine = "rbind") %do% {
+  l2r.segments <- dplyr::bind_rows(purrr::map(seq_along(data$data$ch), function(k) {
     segrle <- rle(data$data$Tumor_LogR_segmented[data$data$ch[[k]],1])
     segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
-    # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- data$data$chrs[[k]]
-    probecs <- cumsum(segdf$Probes)
     segdf$End.idx <- cumsum(segdf$Probes) + data$data$ch[[k]][1] - 1
     segdf$Start.idx <- c(data$data$ch[[k]][1], segdf$End.idx[-nrow(segdf)] + 1)
     segdf$Start <- data$data$SNPpos$pos[segdf$Start.idx]
     segdf$End <- data$data$SNPpos$pos[segdf$End.idx]
-    segdf <- segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
-  }
+    segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
+  }))
 
   my.mad <- get.mad(data$data$Tumor_LogR[,1])
 
@@ -1274,20 +1260,18 @@ Segment.ff <- function(RDS.file = NULL, segmenter = "ASCAT", ...) {
 }
 
 ## Run Segment.ff() in batch mode
-Segment.ff.Batch <- function (RDS.files = list.files(path = getwd(), pattern = "_processed.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), segmenter = "ASCAT", nthread = 1, cluster.type = "PSOCK", ...) {
+Segment.ff.Batch <- function (RDS.files = list.files(path = getwd(), pattern = "_processed.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), segmenter = "ASCAT", nthread = 1, ...) {
   if (length(RDS.files) == 0) stop("A list of RDS files is required !", call. = FALSE)
   message("Running EaCoN.Segment.ff() in batch mode ...")
   message(paste0(" Found ", length(RDS.files), " files to process."))
   current.bitmapType <- getOption("bitmapType")
   if (length(RDS.files) < nthread) nthread <- length(RDS.files)
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  eacon.batchres <- foreach::foreach(r = seq_along(RDS.files), .inorder = TRUE, .errorhandling = "stop") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(RDS.files, function(rds) {
     EaCoN.set.bitmapType(type = current.bitmapType)
-    Segment.ff(RDS.file = RDS.files[r], segmenter = segmenter, ...)
-  }
-  parallel::stopCluster(cl)
+    Segment.ff(RDS.file = rds, segmenter = segmenter, ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
 }
 
 ## ASCAT Total and Allele-Specific Copy Number
@@ -1309,7 +1293,10 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
   if (dir.exists(odir)) {
     if (force) {
       unlink(odir, recursive = TRUE, force = FALSE)
-    } else stop(tmsg(paste0("Output directory [", out.dir, "] already exists !")), call. = FALSE)
+    } else {
+      warning(tmsg(paste0("Output directory [", odir, "] already exists ! Skipping. Use force = TRUE to overwrite.")), call. = FALSE)
+      return(invisible(NULL))
+    }
   }
 
   samplename <- data$meta$basic$samplename
@@ -1332,13 +1319,9 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
   gammavec <- if(length(gammaRange) > 1 ) seq(gammaRange[1], gammaRange[2], 0.05) else gammaRange
   oridirx <- getwd()
 
-  cls <- parallel::makeCluster(spec = nsubthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cls)
-  gamma <- 0
-  `%dopar%` <- foreach::"%dopar%"
-  # fit.val <- as.data.frame(foreach::foreach(gamma = gammavec, .combine = "rbind", .inorder = TRUE) %dopar% {
-  fit.val <- as.data.frame(foreach::foreach(gamma = gammavec,
-    .combine = "rbind", .inorder = TRUE, .final = as.data.frame) %dopar% {
+  future::plan(future::multisession, workers = nsubthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  fit.val <- furrr::future_map(gammavec, function(gamma) {
     tmsg(paste0(" gamma = ", gamma))
     odirg <- paste0(odir, "/gamma", sprintf("%.2f", gamma))
     dir.create(path = odirg, recursive = TRUE, showWarnings = FALSE)
@@ -1551,11 +1534,8 @@ ASCN.ASCAT <- function(data = NULL, gammaRange = c(.35,.95), nsubthread = 1, clu
       setwd(oridirx)
       return(unname(c(gamma, unlist(my.ascat.seg.ascn$ploidy, use.names = FALSE), my.ascat.seg.ascn$aberrantcellfraction, my.ascat.seg.ascn$goodnessOfFit, my.ascat.seg.ascn$psi)))
     }
-  })
-  parallel::stopCluster(cls)
-  
-  # rownames(fit.val) <- gammavec
-  fit.val <- as.data.frame(fit.val)
+  }, .options = furrr::furrr_options(seed = TRUE))
+  fit.val <- as.data.frame(do.call(rbind, fit.val))
   rownames(fit.val) <- gammavec[seq_len(nrow(fit.val))]
   
   # colnames(fit.val) <- c("gamma", "ploidy", "rounded.ploidy", "aberrant.cell.fraction", "GoF", "psi")
@@ -1607,7 +1587,10 @@ ASCN.FACETS <- function(data = NULL, out.dir = getwd(), force = FALSE, ...) {
   if (dir.exists(odir)) {
     if (force) {
       unlink(odir, recursive = TRUE, force = FALSE)
-    } else stop(tmsg(paste0("Output directory [", out.dir, "] already exists !")), call. = FALSE)
+    } else {
+      warning(tmsg(paste0("Output directory [", odir, "] already exists ! Skipping. Use force = TRUE to overwrite.")), call. = FALSE)
+      return(invisible(NULL))
+    }
   }
 
   samplename <- data$meta$basic$samplename
@@ -1787,7 +1770,10 @@ ASCN.SEQUENZA <- function(data = NULL, max.ploidy = 4, ploidy.step = .1, seg.min
   if (dir.exists(odir)) {
     if (force) {
       unlink(odir, recursive = TRUE, force = FALSE)
-    } else stop(tmsg(paste0("Output directory [", out.dir, "] already exists !")), call. = FALSE)
+    } else {
+      warning(tmsg(paste0("Output directory [", odir, "] already exists ! Skipping. Use force = TRUE to overwrite.")), call. = FALSE)
+      return(invisible(NULL))
+    }
   }
 
   if (!is.list(data)) stop(tmsg("data should be a list !"), call. = FALSE)
@@ -1988,21 +1974,18 @@ ASCN.ff <- function(RDS.file = NULL, ...) {
 }
 
 ## Run ASCN.ff() in batch mode
-ASCN.ff.Batch <- function(RDS.files = list.files(path = getwd(), pattern = "\\.SEG\\..*\\.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), nthread = 1, cluster.type = "PSOCK", ...) {
+ASCN.ff.Batch <- function(RDS.files = list.files(path = getwd(), pattern = "\\.SEG\\..*\\.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), nthread = 1, ...) {
   if (length(RDS.files) == 0) stop("A list of RDS files is required !", call. = FALSE)
   message("Running EaCoN.ASCN.ff() in batch mode ...")
   message(paste0(" Found ", length(RDS.files), " files to process."))
   current.bitmapType <- getOption("bitmapType")
   if (length(RDS.files) < nthread) nthread <- length(RDS.files)
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  r <- ""
-  eacon.batchres <- foreach::foreach(r = seq_along(RDS.files), .inorder = TRUE, .errorhandling = "stop") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(RDS.files, function(rds) {
     EaCoN.set.bitmapType(type = current.bitmapType)
-    ASCN.ff(RDS.file = RDS.files[r], ...)
-  }
-  parallel::stopCluster(cl)
+    ASCN.ff(RDS.file = rds, ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
 }
 
 ## Generate the HTML report
@@ -2018,8 +2001,6 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   # ldb = "/mnt/data_cigogne/bioinfo/"
 
   oridir <- getwd()
-
-  `%do%` <- foreach::"%do%"
 
   if (!is.list(data)) stop(tmsg("data should be a list !"), call. = FALSE)
 
@@ -2050,37 +2031,34 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
     ## A refGene was provided and file exists : loading !
     rg.df <- read.table.fast(file = refGene.table)
     rg.df <- rg.df[grep(pattern = "^chr([0-9]+|X|Y)$", x = rg.df$chrom),]
-    gen.df <- foreach::foreach(k = sort(unique(rg.df$chrom)), .combine = "rbind") %do% {
+    gen.df <- dplyr::bind_rows(purrr::map(sort(unique(rg.df$chrom)), function(k) {
       rg.k <- rg.df[rg.df$chrom == k, ]
       rg.gr <- GenomicRanges::GRanges(seqnames = rg.k$name2, IRanges::IRanges(rg.k$txStart, rg.k$txEnd), strand = rg.k$strand)
       rdx.k <- as.data.frame(GenomicRanges::reduce(rg.gr, ignore.strand = FALSE))
-      rdx.df <- data.frame(symbol = as.character(rdx.k$seqnames), chrom = k, chrN = as.numeric(cs$chrom2chr[k]), start = rdx.k$start, end = rdx.k$end, width = rdx.k$width, strand = as.character(rdx.k$strand))
-      return(rdx.df)
-    }
+      data.frame(symbol = as.character(rdx.k$seqnames), chrom = k, chrN = as.numeric(cs$chrom2chr[k]), start = rdx.k$start, end = rdx.k$end, width = rdx.k$width, strand = as.character(rdx.k$strand))
+    }))
     gen.df <- gen.df[order(gen.df$chrN, gen.df$start, gen.df$end),]
   }
 
   if (!("cbs" %in% names(data))) stop(tmsg("CBS slot not found in RDS object ! Are you sure it is a valid one ?"), call. = FALSE)
-  cbs.df <- foreach::foreach(seg = 1:nrow(data$cbs$cut), .combine = "rbind") %do% {
-    ingenz <- if(exists("gen.df")) gen.df$symbol[gen.df$chrN == data$cbs$cut$Chr[seg] & gen.df$start <= data$cbs$cut$End[seg] & gen.df$end >= data$cbs$cut$Start[seg]] else ingenz <- "NA"
+  cbs.df <- dplyr::bind_rows(purrr::map(seq_len(nrow(data$cbs$cut)), function(seg) {
+    ingenz <- if(exists("gen.df")) gen.df$symbol[gen.df$chrN == data$cbs$cut$Chr[seg] & gen.df$start <= data$cbs$cut$End[seg] & gen.df$end >= data$cbs$cut$Start[seg]] else "NA"
     ingenz.len <- if(exists("gen.df")) length(ingenz) else "NA"
-    return(data.frame(data$cbs$cut[seg, ], Genes = ingenz.len, Symbol = paste0(ingenz, collapse = ",")))
-  }
+    data.frame(data$cbs$cut[seg, ], Genes = ingenz.len, Symbol = paste0(ingenz, collapse = ","))
+  }))
 
   tmsg("Building L2R segmentation table ...")
-  l2r.segments <- foreach::foreach(k = 1:length(my.ascat.seg$ch), .combine = "rbind") %do% {
+  l2r.segments <- dplyr::bind_rows(purrr::map(seq_along(my.ascat.seg$ch), function(k) {
     segrle <- rle(my.ascat.seg$Tumor_LogR_segmented[my.ascat.seg$ch[[k]],1])
     segdf <- data.frame(Probes = segrle$lengths, Value = segrle$values)
-    # segdf$Chr <- k
     segdf$Chr <- unlist(cs$chrom2chr[data$data$chrs[k]])
     segdf$Chrom <- my.ascat.seg$chrs[[k]]
-    probecs <- cumsum(segdf$Probes)
     segdf$End.idx <- as.integer(cumsum(segdf$Probes) + my.ascat.seg$ch[[k]][1] - 1)
     segdf$Start.idx <- as.integer(c(my.ascat.seg$ch[[k]][1], segdf$End.idx[-nrow(segdf)] + 1))
     segdf$Start <- as.integer(my.ascat.seg$SNPpos$pos[segdf$Start.idx])
     segdf$End <- as.integer(my.ascat.seg$SNPpos$pos[segdf$End.idx])
-    segdf <- segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
-  }
+    segdf[, c(3, 4, 7, 8, 2, 1, 6, 5)]
+  }))
 
   tmsg("Building BAF segmentation table ...")
   bafpos <- my.ascat.seg$SNPpos[rownames(my.ascat.seg$Tumor_LogR_segmented) %in% rownames(my.ascat.seg$Tumor_BAF_segmented[[1]]),]
@@ -2136,25 +2114,29 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   } else load(targets.table)
   if(exists("targetlist")) {
     gen.targ <- gen.df[gen.df$symbol %in% targetlist, ]
-    targ.regz <- foreach::foreach(g = 1:nrow(gen.targ), .combine = "rbind") %do% {
+    targ.regz <- dplyr::bind_rows(purrr::map(seq_len(nrow(gen.targ)), function(g) {
       ginreg.idx <- which(cbsNC.df$Chr == gen.targ$chrN[g] & cbsNC.df$Start <= gen.targ$end[g] & cbsNC.df$End >= gen.targ$start[g])
-      ginreg <- foreach::foreach(gg = ginreg.idx, .combine = "rbind") %do% {
+      dplyr::bind_rows(purrr::map(ginreg.idx, function(gg) {
         match.start <- max(cbsNC.df$Start[gg], gen.targ$start[g])
         match.end <- min(cbsNC.df$End[gg], gen.targ$end[g])
-        return(cbind(gen.targ[g, c(1, 2, 4:7)], match.start = match.start, match.end = match.end, cbsNC.df[gg,c(6, 9)], l2rwidth = cbsNC.df$End[gg] - cbsNC.df$Start[gg] + 1))
-      }
-      return(ginreg)
-    }
-    targ.regz <- foreach::foreach(g = 1:nrow(targ.regz), .combine = "rbind") %do% {
-      # ginreg.idx <- which(paste0("chr", baf.seg$chrA) == targ.regz$chrom[g] & baf.seg$Start <= targ.regz$match.end[g] & baf.seg$End >= targ.regz$match.start[g])
+        cbind(gen.targ[g, c(1, 2, 4:7)], match.start = match.start, match.end = match.end,
+              L2R.Status = cbsNC.df$Status[gg], Log2Ratio = cbsNC.df$Log2Ratio[gg],
+              l2rwidth = cbsNC.df$End[gg] - cbsNC.df$Start[gg] + 1)
+      }))
+    }))
+    targ.regz <- dplyr::bind_rows(purrr::map(seq_len(nrow(targ.regz)), function(g) {
       ginreg.idx <- which(baf.seg$chrA == targ.regz$chrom[g] & baf.seg$Start <= targ.regz$match.end[g] & baf.seg$End >= targ.regz$match.start[g])
-      ginreg <- foreach::foreach(gg = ginreg.idx, .combine = "rbind") %do% {
+      dplyr::bind_rows(purrr::map(ginreg.idx, function(gg) {
         match.start <- max(baf.seg$Start[gg], targ.regz$match.start[g])
         match.end <- min(baf.seg$End[gg], targ.regz$match.end[g])
-        return(cbind(targ.regz[g,c(1:6)], match.start = match.start, match.end = match.end, match.width = match.end - match.start +1, targ.regz[g,c(10,9,11)], baf.seg[gg,c(12,11)], bafwidth = baf.seg$End[gg] - baf.seg$Start[gg] + 1))
-      }
-      return(ginreg)
-    }
+        cbind(targ.regz[g, c(1:6)], match.start = match.start, match.end = match.end,
+              match.width = match.end - match.start + 1,
+              L2R.Status = targ.regz$L2R.Status[g], Log2Ratio = targ.regz$Log2Ratio[g],
+              l2rwidth = targ.regz$l2rwidth[g],
+              BAF.Status = baf.seg$Status[gg], BAF.Value = baf.seg$Value[gg],
+              bafwidth = baf.seg$End[gg] - baf.seg$Start[gg] + 1)
+      }))
+    }))
     targ.regz$Cytoband <- vapply(1:nrow(targ.regz), function(x) {
       scb <- cs$cytobands$chrom == targ.regz$chrom[x] & cs$cytobands$start <= targ.regz$start[x] & cs$cytobands$end >= targ.regz$start[x]
       return(paste0(cs$cytobands$chrA[scb], cs$cytobands$cytoband[scb]))
@@ -2175,31 +2157,36 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
   gen.trunk.idx <- which(gen.trunk.idx.list > 1)
   if (length(gen.trunk.idx) > 0) {
     gen.trunk <- gen.df[gen.trunk.idx,]
-    trunc.regz <- foreach::foreach(g = 1:nrow(gen.trunk), .combine = "rbind") %do% {
+    trunc.regz <- dplyr::bind_rows(purrr::map(seq_len(nrow(gen.trunk)), function(g) {
       ginreg.idx <- which(cbsNC.df$Chr == gen.trunk$chrN[g] & cbsNC.df$Start <= gen.trunk$end[g] & cbsNC.df$End >= gen.trunk$start[g])
-      ginreg <- foreach::foreach(gg = ginreg.idx, .combine = "rbind") %do% {
+      dplyr::bind_rows(purrr::map(ginreg.idx, function(gg) {
         match.start <- max(cbsNC.df$Start[gg], gen.trunk$start[g])
         match.end <- min(cbsNC.df$End[gg], gen.trunk$end[g])
-        return(cbind(gen.trunk[g, c(1, 2, 4:7)], match.start = match.start, match.end = match.end, cbsNC.df[gg,c(6, 9)], l2rwidth = cbsNC.df$End[gg] - cbsNC.df$Start[gg] + 1))
-      }
-      return(ginreg)
-    }
-    trunc.regz <- foreach::foreach(g = 1:nrow(trunc.regz), .combine = "rbind") %do% {
-      # ginreg.idx <- which(paste0("chr", baf.seg$chrA) == trunc.regz$chrom[g] & baf.seg$Start <= trunc.regz$match.end[g] & baf.seg$End >= trunc.regz$match.start[g])
-      # ginreg.idx <- which(paste0("chr", baf.seg$chrA) == trunc.regz$chrom[g] & ((baf.seg$Start <= trunc.regz$match.start[g] & baf.seg$End >= trunc.regz$match.start[g]) | (baf.seg$Start <= trunc.regz$match.end[g] & baf.seg$End >= trunc.regz$match.end[g])))
-      # ginreg.idx <- which(paste0("chr", baf.seg$chrA) == trunc.regz$chrom[g] & baf.seg$Start <= trunc.regz$match.end[g] & baf.seg$End >= trunc.regz$match.start[g])
+        cbind(gen.trunk[g, c(1, 2, 4:7)], match.start = match.start, match.end = match.end,
+              L2R.Status = cbsNC.df$Status[gg], Log2Ratio = cbsNC.df$Log2Ratio[gg],
+              l2rwidth = cbsNC.df$End[gg] - cbsNC.df$Start[gg] + 1)
+      }))
+    }))
+    trunc.regz <- dplyr::bind_rows(purrr::map(seq_len(nrow(trunc.regz)), function(g) {
       ginreg.idx <- which(baf.seg$chrA == trunc.regz$chrom[g] & baf.seg$Start <= trunc.regz$match.end[g] & baf.seg$End >= trunc.regz$match.start[g])
-      if (length(ginreg.idx > 0)) {
-        ginreg <- foreach::foreach(gg = ginreg.idx, .combine = "rbind") %do% {
+      if (length(ginreg.idx) > 0) {
+        dplyr::bind_rows(purrr::map(ginreg.idx, function(gg) {
           match.start <- max(baf.seg$Start[gg], trunc.regz$match.start[g])
           match.end <- min(baf.seg$End[gg], trunc.regz$match.end[g])
-          return(cbind(trunc.regz[g,c(1:6)], match.start = match.start, match.end = match.end, match.width = match.end - match.start +1, trunc.regz[g,c(10,9,11)], baf.seg[gg,c(12,11)], bafwidth = baf.seg$End[gg] - baf.seg$Start[gg] + 1))
-        }
+          cbind(trunc.regz[g, c(1:6)], match.start = match.start, match.end = match.end,
+                match.width = match.end - match.start + 1,
+                L2R.Status = trunc.regz$L2R.Status[g], Log2Ratio = trunc.regz$Log2Ratio[g],
+                l2rwidth = trunc.regz$l2rwidth[g],
+                BAF.Status = baf.seg$Status[gg], BAF.Value = baf.seg$Value[gg],
+                bafwidth = baf.seg$End[gg] - baf.seg$Start[gg] + 1)
+        }))
       } else {
-        ginreg <- data.frame(trunc.regz[g,c(1:8)], match.width = trunc.regz$match.end[g] - trunc.regz$match.start[g] + 1, trunc.regz[g,c(10,9,11)], Status = NA, Value = NA, bafwidth = NA, check.names = FALSE)
+        data.frame(trunc.regz[g, c(1:8)], match.width = trunc.regz$match.end[g] - trunc.regz$match.start[g] + 1,
+                   L2R.Status = trunc.regz$L2R.Status[g], Log2Ratio = trunc.regz$Log2Ratio[g],
+                   l2rwidth = trunc.regz$l2rwidth[g],
+                   BAF.Status = NA, BAF.Value = NA, bafwidth = NA, check.names = FALSE)
       }
-      return(ginreg)
-    }
+    }))
     trunc.regz$Cytoband <- vapply(1:nrow(trunc.regz), function(x) {
       scb <- cs$cytobands$chrom == trunc.regz$chrom[x] & cs$cytobands$start <= trunc.regz$start[x] & cs$cytobands$end >= trunc.regz$start[x]
       return(paste0(cs$cytobands$chrA[scb], cs$cytobands$cytoband[scb]))
@@ -2261,16 +2248,15 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
       )
 
       chip.list <- names(data$meta$affy)[names(data$meta$affy) != "analysis"]
-      meta.tags$val <- foreach(t = seq_len(nrow(meta.tags)), .combine = "c") %do% {
+      meta.tags$val <- purrr::map_chr(seq_len(nrow(meta.tags)), function(t) {
         if (meta.tags$entry[t] == "analysis") {
-          ext.meta <- getmeta(key = meta.tags$key[t], meta = data$meta$affy$analysis)
+          getmeta(key = meta.tags$key[t], meta = data$meta$affy$analysis)
         } else if (meta.tags$entry[t] %in% c("eacon", "basic")) {
-          ext.meta <- getmeta(key = meta.tags$key[t], meta = data$meta[[meta.tags$entry[t]]])
+          getmeta(key = meta.tags$key[t], meta = data$meta[[meta.tags$entry[t]]])
         } else {
-          ext.meta <- paste0(purrr::map_chr(chip.list, function(p) getmeta(key = meta.tags$key[t], meta = data$meta$affy[[p]][[meta.tags$entry[t]]])), collapse = " ")
+          paste0(purrr::map_chr(chip.list, function(p) getmeta(key = meta.tags$key[t], meta = data$meta$affy[[p]][[meta.tags$entry[t]]])), collapse = " ")
         }
-        return(ext.meta)
-      }
+      })
 
       arraytype <- meta.tags$val[meta.tags$key == "affymetrix-array-type"]
       meta.tags$val[meta.tags$key == "affymetrix-scan-date"] <- gsub(replacement = "/", x = gsub(replacement = "_", x = gsub(replacement = "", x = meta.tags$val[meta.tags$key == "affymetrix-scan-date"], pattern = "Z", ignore.case = FALSE), pattern = "T", ignore.case = FALSE), pattern = "-", ignore.case = FALSE)
@@ -2473,10 +2459,10 @@ Annotate <- function(data = NULL, refGene.table = NULL, targets.table = NULL, re
       ecb <- cs$cytobands$chrN == segbaf.df$Chr[x] & cs$cytobands$start <= segbaf.df$End[x] & cs$cytobands$end >= segbaf.df$End[x]
       return(paste0(cs$cytobands$chrA[ecb], cs$cytobands$cytoband[ecb]))
     }, "a")
-    segbaf.df <- foreach::foreach(seg = 1:nrow(segbaf.df), .combine = "rbind") %do% {
+    segbaf.df <- dplyr::bind_rows(purrr::map(seq_len(nrow(segbaf.df)), function(seg) {
       ingenz <- gen.df$symbol[gen.df$chrN == segbaf.df$Chr[seg] & gen.df$start <= segbaf.df$End[seg] & gen.df$end >= segbaf.df$Start[seg]]
-      return(data.frame(segbaf.df[seg, ], Genes = length(ingenz), Symbol = paste0(ingenz, collapse = ",")))
-    }
+      data.frame(segbaf.df[seg, ], Genes = length(ingenz), Symbol = paste0(ingenz, collapse = ","))
+    }))
     segbaf.df <- segbaf.df[,c(13,8:10,14,15,12,11,3,16,17)]
     colnames(segbaf.df) <- c("Chr", "Start", "End", "Width", "Start Cytoband", "End Cytoband", "Status", "BAF", "# Markers", "# Genes", "symbols")
     # segbaf.df$Start <- format(segbaf.df$Start, big.mark = ",")
@@ -2578,22 +2564,19 @@ Annotate.ff <- function (RDS.file = NULL, ...) {
 }
 
 ## Run EaCoN.Annotate() in batch mode
-Annotate.ff.Batch <- function(RDS.files = list.files(path = getwd(), pattern = "\\.SEG\\..*\\.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), nthread = 1, cluster.type = "PSOCK", ...) {
+Annotate.ff.Batch <- function(RDS.files = list.files(path = getwd(), pattern = "\\.SEG\\..*\\.RDS$", full.names = TRUE, recursive = TRUE, ignore.case = TRUE, include.dirs = FALSE), nthread = 1, ...) {
 
   if (length(RDS.files) == 0) stop("A list of RDS files is required !", call. = FALSE)
   message("Running Annotate.ff() in batch mode ...")
   message(paste0(" Found ", length(RDS.files), " files to process."))
   current.bitmapType <- getOption("bitmapType")
   if (length(RDS.files) < nthread) nthread <- length(RDS.files)
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  s <- ""
-  targ.all <- foreach::foreach(s = 1:length(RDS.files), .inorder = FALSE, .errorhandling = "stop") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(RDS.files, function(rds) {
     EaCoN.set.bitmapType(type = current.bitmapType)
-    Annotate.ff(RDS.file = RDS.files[s], ...)
-  }
-  parallel::stopCluster(cl)
+    Annotate.ff(RDS.file = rds, ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
 }
 
 Annotate.solo <- function(cbs.file = NULL, genome = NULL, ldb = "/mnt/data_cigogne/bioinfo/", grd="grd") {

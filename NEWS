@@ -1,6 +1,25 @@
 EaCoN
 -----
 
+EaCoN 0.5.0 (2026-06-19) *Parallel Universe*
+-----------------
+CHANGES
+- Phase 3: replaced foreach/doParallel with furrr/future throughout all *.Batch() functions and serial %do% loops
+- All 9 %dopar% blocks replaced with furrr::future_walk() / furrr::future_map()
+- All 33 serial %do% blocks replaced: rbind-combine -> dplyr::bind_rows(purrr::map()); c-combine -> unlist(purrr::map()); side-effect loops -> for(); nested loops -> purrr::map() outer + furrr::future_map() or purrr::map() inner
+- PELT rescue loops (Segment.ASCAT/FACETS/SEQUENZA) converted to plain for() loops
+- Gap detection loop (Segment.ASCAT) converted to unlist(lapply(...), recursive = FALSE)
+- Annotate() refGene, cbs.df, L2R segments, targets, truncated gene, BAF segment loops all converted to dplyr::bind_rows(purrr::map())
+- Annotate() meta.tags$val loop converted to purrr::map_chr()
+- germline_functions.R: BAF.Rescale and EaCoN.Predict.Germline chr x bin nested loops converted to purrr::map()
+- wes_process.R: pileup.go, bedBinner, loc.nt.count.hs converted to furrr; CN/SNP assembly and loc.nt.gcc.hs.multi converted to purrr
+- BED_functions.R: BedGC.fasta, BedGC.fasta.chr, BedGC.R all converted (nested %dopar%/%do% -> furrr::future_map() + purrr::map())
+- Removed cluster.type = "PSOCK" argument from all *.Batch() functions (future handles backend)
+- future::plan() set at batch-function entry with on.exit() cleanup
+- ASCN.ASCAT() gamma sweep: furrr::future_map(); result assembled with do.call(rbind, ...)
+- ASCN output-dir check: stop() -> warning() + return(invisible(NULL)) so batch continues on re-runs
+- Dependencies: removed doParallel and foreach from Imports; added future and furrr
+
 EaCoN 0.4.0 (2026-06-18) *The Resurrection*
 -----------------
 Maintainer change: Axel Künstner (Universität zu Lübeck) takes over as maintainer.

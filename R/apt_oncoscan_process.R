@@ -344,7 +344,7 @@ OS.Process <- function(ATChannelCel = NULL, GCChannelCel = NULL, samplename = NU
 
 
 ## Same in batch mode
-OS.Process.Batch <- function(pairs.file = NULL, nthread = 1, cluster.type = "PSOCK", ...) {
+OS.Process.Batch <- function(pairs.file = NULL, nthread = 1, ...) {
   ## Checking the pairs.file
   if (!file.exists(pairs.file)) stop("Could not find pairs.file !", call. = FALSE)
   message("Reading and checking pairs.file ...")
@@ -389,18 +389,12 @@ OS.Process.Batch <- function(pairs.file = NULL, nthread = 1, cluster.type = "PSO
   
   current.bitmapType <- getOption("bitmapType")
   message("Running APT ...")
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  
-  p <- 0
-  osres <- foreach(p = seq_len(nrow(mypairs)), .inorder = FALSE, .errorhandling = "stop") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(seq_len(nrow(mypairs)), function(p) {
     EaCoN.set.bitmapType(type = current.bitmapType)
     OS.Process(ATChannelCel = mypairs$ATChannelCel[p], GCChannelCel = mypairs$GCChannelCel[p], samplename = mypairs$SampleName[p], ...)
-  }
-  message("Stopping cluster ...")
-  parallel::stopCluster(cl)
-  
+  }, .options = furrr::furrr_options(seed = TRUE))
   message("Done.")
 }
 

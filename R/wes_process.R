@@ -244,10 +244,9 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
     
     #### Launching cluster
     if (length(unique(bed.data$chr)) < nsubthread) nsubthread <- length(unique(bed.data$chr))
-    cl <- parallel::makeCluster(spec = nsubthread, type = cluster.type, outfile = "")
-    doParallel::registerDoParallel(cl)
-    k <- 0
-    BAMcounts <- foreach::foreach(k = unique(as.character(bed.data$chr)), .inorder = TRUE, .export = c("tmsg", "BSg.obj", "bedbam2pup", "seq.int2")) %dopar% {
+    future::plan(future::multisession, workers = nsubthread)
+    on.exit(future::plan(future::sequential), add = TRUE)
+    BAMcounts <- furrr::future_map(unique(as.character(bed.data$chr)), function(k) {
       
       tmsg(paste0(" Sequence : ", k))
 
@@ -290,27 +289,26 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
       colnames(SNP.table) <- c("chr", "pos", "bin", "tot_count.test", "alt_count.test", "tot_count.ref", "alt_count.ref")
       
       gc()
-      return(list(CN = CN.table, SNP = SNP.table))
-    }
-    stopCluster(cl)
-    return(BAMcounts)
+      list(CN = CN.table, SNP = SNP.table)
+    }, .options = furrr::furrr_options(seed = TRUE))
+    BAMcounts
   }
   
   COUNTS.all <- pileup.go(testBAM = testBAM, refBAM = refBAM, bed.data = bed.data, scanBamFlag = param.FLAG, pileupParam = param.PILEUP, nsubthread = nsubthread, cluster.type = cluster.type)
   
-  CN.all <- foreach(k = seq_along(COUNTS.all), .combine = "rbind") %do% {
+  CN.all <- dplyr::bind_rows(purrr::map(seq_along(COUNTS.all), function(k) {
     k.tmp <- COUNTS.all[[k]]$CN
-    COUNTS.all[[k]]$CN <- NULL
+    COUNTS.all[[k]]$CN <<- NULL
     gc()
-    return(k.tmp)
-  }
-  
-  SNP.all <- foreach(k = seq_along(COUNTS.all), .combine = "rbind") %do% {
+    k.tmp
+  }))
+
+  SNP.all <- dplyr::bind_rows(purrr::map(seq_along(COUNTS.all), function(k) {
     k.tmp <- COUNTS.all[[k]]$SNP
-    COUNTS.all[[k]]$SNP <- NULL
+    COUNTS.all[[k]]$SNP <<- NULL
     gc()
-    return(k.tmp)
-  }
+    k.tmp
+  }))
   
   rm(COUNTS.all)
   gc()
@@ -346,7 +344,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
   gw.rd <- sum(WESobj$RD$end - WESobj$RD$start +1)
   gw.snp <- nrow(WESobj$SNP)
   rd.cov <- data.frame(cuts = c(1, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200))
-  rd.cov <- cbind(rd.cov, t(foreach::foreach(x = rd.cov$cuts, .combine = "cbind") %do% {
+  rd.cov <- cbind(rd.cov, t(vapply(rd.cov$cuts, function(x) {
     test.rd.in <- WESobj$RD$tot_count.test >= x
     ref.rd.in <- WESobj$RD$tot_count.ref >= x
     test.snprd.in <- WESobj$SNP$tot_count.test >= x
@@ -355,8 +353,8 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
     ref.cut.cov <- if(!any(ref.rd.in)) NA else (sum(WESobj$RD$end[ref.rd.in] - WESobj$RD$start[ref.rd.in] +1)/gw.rd)
     test.snpcut.cov <- if(!any(test.snprd.in)) NA else (length(which(test.snprd.in))/gw.snp)
     ref.snpcut.cov <- if(!any(ref.snprd.in)) NA else (length(which(ref.snprd.in))/gw.snp)
-    return(c(test.cut.cov, ref.cut.cov, test.snpcut.cov, ref.snpcut.cov))
-  }))
+    c(test.cut.cov, ref.cut.cov, test.snpcut.cov, ref.snpcut.cov)
+  }, numeric(4))))
   colnames(rd.cov) <- c("MinDepth", "TestBINCoverage", "RefBINCoverage", "TestBAFCoverage", "RefBAFCoverage")
   rm(test.snprd.in, ref.snprd.in, test.rd.in, ref.rd.in)
   
@@ -401,7 +399,7 @@ WES.Bin <- function(testBAM = NULL, refBAM = NULL, BINpack = NULL, samplename = 
 }
 
 ## Performs the binning of BAMs using a BINpack, batch mode
-WES.Bin.Batch <- function(BAM.list.file = NULL, BINpack = NULL, nthread = 1, cluster.type = "PSOCK", ...) {
+WES.Bin.Batch <- function(BAM.list.file = NULL, BINpack = NULL, nthread = 1, ...) {
 
   if (!file.exists(BAM.list.file)) stop("Could not find BAM.list.file !", call. = FALSE)
   message("Reading and checking BAM.list.file ...")
@@ -445,14 +443,12 @@ WES.Bin.Batch <- function(BAM.list.file = NULL, BINpack = NULL, nthread = 1, clu
   message("Running EaCoN.WES.Bin() in batch mode ...")
   message(paste0("Found ", nrow(myBAMs), " samples to process ..."))
   current.bitmapType <- getOption("bitmapType")
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  eacon.batchres <- foreach::foreach(r = seq_len(nrow(myBAMs)), .inorder = TRUE, .errorhandling = "stop", .export = c("EaCoN.set.bitmapType", "WES.Bin", "tmsg")) %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(seq_len(nrow(myBAMs)), function(r) {
     EaCoN.set.bitmapType(type = current.bitmapType)
-    WES.Bin(testBAM = myBAMs$testBAM[r], refBAM = myBAMs$refBAM[r], BINpack = BINpack, samplename = myBAMs$SampleName[r], cluster.type = cluster.type, ...)
-  }
-  parallel::stopCluster(cl)
+    WES.Bin(testBAM = myBAMs$testBAM[r], refBAM = myBAMs$refBAM[r], BINpack = BINpack, samplename = myBAMs$SampleName[r], ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
 }
 
 ## Performs the normalization of WES L2R and BAF signals
@@ -831,35 +827,30 @@ WES.Normalize.ff <- function(BIN.RDS.file = NULL, ...) {
 }
 
 ## Runs WES.Normalize.ff, batch mode
-WES.Normalize.ff.Batch <- function(BIN.RDS.files = list.files(path = getwd(), pattern = "_binned.RDS$", all.files = FALSE, full.names = TRUE, recursive = TRUE, ignore.case = FALSE, include.dirs = FALSE), nthread = 1, cluster.type = "PSOCK", ...) {
+WES.Normalize.ff.Batch <- function(BIN.RDS.files = list.files(path = getwd(), pattern = "_binned.RDS$", all.files = FALSE, full.names = TRUE, recursive = TRUE, ignore.case = FALSE, include.dirs = FALSE), nthread = 1, ...) {
   if (length(BIN.RDS.files) == 0) stop("No file found to process !", call. = FALSE)
   message("Running EaCoN.WES.Normalize.ff() in batch mode ...")
   message(paste0("Found ", length(BIN.RDS.files), " samples to process ..."))
   current.bitmapType <- getOption("bitmapType")
-  `%dopar%` <- foreach::"%dopar%"
-  cl <- parallel::makeCluster(spec = nthread, type = cluster.type, outfile = "")
-  doParallel::registerDoParallel(cl)
-  eacon.batchres <- foreach::foreach(r = seq_along(BIN.RDS.files), .inorder = TRUE, .errorhandling = "stop") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  furrr::future_walk(BIN.RDS.files, function(rds) {
     EaCoN.set.bitmapType(type = current.bitmapType)
-    WES.Normalize.ff(BIN.RDS.file = BIN.RDS.files[r], ...)
-  }
-  parallel::stopCluster(cl)
+    WES.Normalize.ff(BIN.RDS.file = rds, ...)
+  }, .options = furrr::furrr_options(seed = TRUE))
 }
 
 bedBinner <- function(bed = NULL, bin.size = 50, nthread = 1) {
   
   bin.size <- as.integer(bin.size)
-  cl <- parallel::makeCluster(spec = nthread, type = "PSOCK", outfile = "")
-  requireNamespace("foreach", quietly = TRUE)
-  doParallel::registerDoParallel(cl)
-  k <- 0
-  bed.binned <- foreach::foreach(k = unique(bed$chr), .combine = "rbind", .export = "tmsg") %dopar% {
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  bed.binned <- dplyr::bind_rows(furrr::future_map(unique(bed$chr), function(k) {
     tmsg(k)
-    
+
     bedk <- bed[bed$chr == k,]
-    
-    b <- 0
-    bbk <- foreach::foreach(b = seq_len(nrow(bedk)), .combine = "rbind", .export = "bin.size") %do% {
+
+    bbk <- dplyr::bind_rows(purrr::map(seq_len(nrow(bedk)), function(b) {
       
       ### Smaller exon
       exon.length <- (bedk$end[b] - bedk$start[b] + 1L)
@@ -893,13 +884,12 @@ bedBinner <- function(bed = NULL, bin.size = 50, nthread = 1) {
       }
       # if(length(bin.starts) != length(bin.starts))
       chrs = rep(bedk$chr[b], mod.count)
-      return(data.frame(chr = chrs, start = bin.starts, end = bin.ends))
-    }
-    
-    return(bbk)
-  }
-  parallel::stopCluster(cl)
-  return(bed.binned)
+      data.frame(chr = chrs, start = bin.starts, end = bin.ends)
+    }))
+
+    bbk
+  }, .options = furrr::furrr_options(seed = TRUE)))
+  bed.binned
 }
 
 ## Compute letter composition of nucleotidic sequences from a (chr, start, end) dataframe, with possible extension.
@@ -951,15 +941,11 @@ loc.nt.count.hs <- function(loc.df = NULL, genome.pkg = "BSgenome.Hsapiens.UCSC.
   print("Starting cluster ...")
   
   if (length(unique(instep)) < nthread) nthread <- length(unique(instep))
-  cl <- parallel::makeCluster(spec = nthread, type = "PSOCK", outfile = "")
-  doParallel::registerDoParallel(cl)
-  requireNamespace("foreach", quietly = TRUE)
-  `%dopar%` <- foreach::"%dopar%"
-  xcounts <- foreach::foreach(x = unique(instep), .combine = "rbind", .packages = c("Biostrings", "BSgenome"), .export = "getSeq") %dopar% {
-    return(Biostrings::alphabetFrequency(BSgenome::getSeq(BSg.obj, myGR.ex[which(instep == x)]), baseOnly = TRUE))
-  }
-  print("Stopping cluster ...")
-  parallel::stopCluster(cl)
+  future::plan(future::multisession, workers = nthread)
+  on.exit(future::plan(future::sequential), add = TRUE)
+  xcounts <- dplyr::bind_rows(furrr::future_map(unique(instep), function(x) {
+    as.data.frame(Biostrings::alphabetFrequency(BSgenome::getSeq(BSg.obj, myGR.ex[which(instep == x)]), baseOnly = TRUE))
+  }, .options = furrr::furrr_options(seed = TRUE)))
 
   out.df <- cbind(loc.df, xcounts)
 
@@ -973,18 +959,15 @@ loc.nt.gcc.hs <- function(loc.counts = NULL) {
 
 ## Compute GC on a (chr, start, end) dataframe using multiple extend values
 loc.nt.gcc.hs.multi <- function(loc.df = NULL, extend.multi = c(50, 100, 200, 400, 800, 1600, 3200, 6400), ...) {
-  requireNamespace("foreach", quietly = TRUE)
-  `%do%` <- foreach::"%do%"
-  gc.list <- foreach::foreach(nt.add = extend.multi) %do% {
+  gc.list <- purrr::map(extend.multi, function(nt.add) {
     print(paste0("Computing GC +", nt.add, " ..."))
     adb.counts <- loc.nt.count.hs(loc.df = loc.df, extend = nt.add, ...)
-    adb.gc <- loc.nt.gcc.hs(loc.counts = adb.counts)
-    return(adb.gc)
-  }
+    loc.nt.gcc.hs(loc.counts = adb.counts)
+  })
   base.df <- gc.list[[1]][,1:4]
-  gc.df <- foreach::foreach(nt.add = seq_along(gc.list), .combine = "cbind") %do% { return(as.integer(round(gc.list[[nt.add]][["GC"]] * 1000))) }
+  gc.df <- do.call(cbind, purrr::map(seq_along(gc.list), function(i) as.integer(round(gc.list[[i]][["GC"]] * 1000))))
   colnames(gc.df) <- paste0("GC", extend.multi)
-  return(data.frame(base.df, gc.df))
+  data.frame(base.df, gc.df)
 }
 
 genome.build.finder <- function(BAM.header = NULL, valid.genomes = NULL) {
