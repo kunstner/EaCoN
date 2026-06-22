@@ -43,12 +43,22 @@ It consists in a series of R packages that perform such type of analysis, from r
 
 ## **NOTES**
 
-* **v0.4.0 requires R >= 4.2.0.** Support for R < 4.2.0 has been dropped as part of the modernisation effort.
-* **WES data support has not been tested in v0.4.0.** The modernisation effort focused on Affymetrix microarray workflows (OncoScan, CytoScan, SNP6). WES functionality remains in the codebase but should be considered untested until further validation.
+* **v0.5.0 requires R >= 4.2.0.** Support for R < 4.2.0 has been dropped as part of the modernisation effort.
+* **WES data support has not been tested in v0.5.0.** The modernisation effort focused on Affymetrix microarray workflows (OncoScan, CytoScan, SNP6). WES functionality remains in the codebase but should be considered untested until further validation.
 * Support for R v4.0.x was added in v0.3.6 thanks to [ShenWei-wei](https://github.com/ShenWei-wei); this fork supersedes that with a full R 4.2+ modernisation.
 * Links for dependencies hosted on the Gustave Roussy NextCloud instance may be expired. If a link fails, please open an issue on the [GitHub repository](https://github.com/kunstner/EaCoN/issues).
 
 ## **QUICK NEWS**
+
+### **2026-06-22 : v0.5.0 _(Parallel Universe)_ is out !**
+* MOD : Complete removal of `foreach` and `doParallel` dependencies.
+* MOD : All parallel `%dopar%` blocks replaced with `furrr::future_walk()` / `furrr::future_map()` backed by `future::plan(multisession)`.
+* MOD : All serial `%do%` blocks replaced with `purrr::map()` / `dplyr::bind_rows()` / `for()` equivalents throughout `EaCoN_functions.R`, `germline_functions.R`, `wes_process.R`, `BED_functions.R`, and `mini_functions.R`.
+* CORR : Fixed `foreach` not found in `furrr` workers (`mini_functions.R`: `oschp.load()`, `compressed_handler()`).
+* CORR : Fixed duplicate `Status` column names in `Annotate()` target/truncated gene tables (`Status...10`, `Status...13` warnings) by switching from positional `cbind` column selection to explicit named assignments.
+* CORR : Fixed `wes_process.R` parse error from garbled `pileup.go` closing braces.
+* CORR : Fixed `NAMESPACE` still declaring `foreach`/`doParallel` imports after code removal.
+* MOD : ASCN output-directory check changed from `stop()` to `warning()` + `return(invisible(NULL))` so batch mode continues to process remaining samples when an output directory already exists.
 
 ### **2026-06-18 : v0.4.0 _(The Resurrection)_ is out !**
 * MOD : Full modernisation for R >= 4.2.0 — package now installs and runs cleanly on current R/Bioconductor.
